@@ -114,9 +114,10 @@ the box.
 
 - **The rest of a frame's fields.** `size`, `scale`, `eye_height`, `easing`, `entities` and
   `entity_tags` are read today; `channels` (§14.9), `parts` (§14.7), `regions` (§14.7) and `thresholds`
-  (§14.3) are ignored with a note until the subsystems they name exist. Explicit integrations use the
-  same explicit command/API path that outranks pack declarations; there is not yet a separate Kindred
-  contract.
+  (§14.3) are ignored with a note until the subsystems they name exist. Mods that size other mods'
+  entities get their own precedence level through `FrameService.setIntegrationFrame`: below an
+  operator's choice, above every pack declaration, re-asserted by the owner rather than
+  re-evaluated, and named for what it is rather than for any one consumer.
 - **The per-axis render half** needs a client run to be believed.
 - **§14.9 channels** and **§14.7 per-part**, after that.
 

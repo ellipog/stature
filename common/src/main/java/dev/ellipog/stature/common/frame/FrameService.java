@@ -31,9 +31,10 @@ import org.jetbrains.annotations.Nullable;
  * no attribute for it: it is a field of {@code EntityDimensions}, defaulting to 85% of the height,
  * and a frame that says otherwise is overriding exactly that default.
  *
- * <p>The precedence order is explicit choice, pack tag, exact pack type, and the vanilla default.
- * Command, direct API size, and explicit frame choices mark an entity so the automatic rule leaves it
- * alone; pack reloads re-evaluate only automatic and not-yet-decided entities.
+ * <p>The precedence order is explicit choice, integration claim, pack tag, exact pack type,
+ * and the vanilla default. Command, direct API size, and explicit frame choices mark an entity so
+ * the automatic rule leaves it alone; integrations sit one level down, outranking packs but never
+ * an operator; pack reloads re-evaluate only automatic and not-yet-decided entities.
  */
 public final class FrameService {
 
@@ -48,6 +49,66 @@ public final class FrameService {
      */
     public static boolean apply(LivingEntity entity, Identifier frameId, int ticks) {
         return applyAs(entity, frameId, ticks, FrameSource.COMMAND);
+    }
+
+    /**
+     * Applies a frame on another mod's behalf, eased over {@code ticks}.
+     *
+     * <p>This is the general integration path: any mod that sizes entities it does not own calls
+     * this instead of reaching for the command path. An integration frame outranks every pack
+     * declaration and re-asserts on its owner's schedule -- Stature never re-evaluates it the way
+     * it re-evaluates TAG and TYPE -- but it never outranks an operator: with a MANUAL or COMMAND
+     * choice on the entity this returns false and changes nothing, and the owner is expected to
+     * back off until the operator's choice is cleared.
+     *
+     * @return false when no frame with that name is loaded, or when an explicit choice is in the
+     *         way; true when the frame was applied
+     */
+    public static boolean setIntegrationFrame(LivingEntity entity, Identifier frameId, int ticks) {
+        if (isExplicitlyOwned(((StatureScale) entity).stature$frameSource())) {
+            return false;
+        }
+        return applyAs(entity, frameId, ticks, FrameSource.INTEGRATION);
+    }
+
+    /**
+     * Withdraws an integration's claim, returning the entity to vanilla so packs or nothing can
+     * take it on the next tick.
+     *
+     * <p>Only an INTEGRATION claim can be withdrawn this way: calling it on an operator-owned
+     * entity returns false and changes nothing, for the same reason applying does. Freezing the
+     * integration's last size in place would be worse than either alternative, so the box is reset
+     * rather than left behind.
+     *
+     * @return false when this entity was not integration-claimed; true when the claim was released
+     */
+    public static boolean clearIntegrationFrame(LivingEntity entity) {
+        StatureScale duck = (StatureScale) entity;
+        if (duck.stature$frameSource() != FrameSource.INTEGRATION) {
+            return false;
+        }
+        duck.stature$setFrame(null);
+        duck.stature$setFrameSource(FrameSource.NONE);
+        duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
+        return true;
+    }
+
+    /**
+     * Whether an operator owns this entity's size right now: a hand size or an applied frame.
+     * Integrations must leave these alone; packs never even get asked.
+     */
+    public static boolean isExplicitlyOwned(FrameSource source) {
+        return source == FrameSource.MANUAL || source == FrameSource.COMMAND;
+    }
+
+    /**
+     * Whether this source travels with the entity through death and save/load alike: explicit
+     * choices and integration claims do, pack declarations re-resolve instead.
+     */
+    public static boolean survivesDeath(FrameSource source) {
+        return source == FrameSource.MANUAL || source == FrameSource.COMMAND
+                || source == FrameSource.INTEGRATION;
     }
 
     /** Whether there is anything a client could be wrong about: a non-vanilla size. */
@@ -101,14 +162,9 @@ public final class FrameService {
 
         StatureScale duck = (StatureScale) entity;
         FrameSource source = duck.stature$frameSource();
-        if (source == FrameSource.MANUAL || source == FrameSource.COMMAND) {
-            return false;
-        }
-        if (source == FrameSource.TAG || source == FrameSource.TYPE) {
-            return false;
-        }
-
-        if (source == FrameSource.DEFAULT) {
+        if (source != FrameSource.NONE) {
+            // Anything decided -- explicit, integrated, automatic, or deliberately vanilla -- stays
+            // decided. Only unclaimed entities may be assigned automatically.
             return false;
         }
 
@@ -183,7 +239,9 @@ public final class FrameService {
     private static boolean refreshOne(LivingEntity entity) {
         StatureScale duck = (StatureScale) entity;
         FrameSource source = duck.stature$frameSource();
-        if (source == FrameSource.MANUAL || source == FrameSource.COMMAND) {
+        if (isExplicitlyOwned(source) || source == FrameSource.INTEGRATION) {
+            // Operator choices are never re-evaluated, and neither are integrations: the owning
+            // mod re-asserts on its own schedule, so a reload must not second-guess it.
             return false;
         }
 

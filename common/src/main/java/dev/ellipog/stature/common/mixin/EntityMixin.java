@@ -115,6 +115,7 @@ public abstract class EntityMixin {
             output.putString(KEY_FRAME, frame.toString());
         }
         if (source == FrameSource.MANUAL || source == FrameSource.COMMAND
+                || source == FrameSource.INTEGRATION
                 || source == FrameSource.TAG || source == FrameSource.TYPE) {
             output.putString(KEY_SOURCE, source.name());
         }
