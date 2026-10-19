@@ -3,13 +3,19 @@ package dev.ellipog.stature.common.mixin;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
+import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -67,6 +73,15 @@ public abstract class EntityMixin {
 
     private static final String KEY_SOURCE = "stature_frame_source";
 
+    private static final String KEY_FORMAT = "stature_format";
+
+    /**
+     * The save format's own version, bumped the day attribute channels stopped writing bases.
+     * Loads from before it get their reach and step bases restored (see below); anything at or
+     * past it was written under the modifier regime and needs no repair.
+     */
+    private static final int SAVE_FORMAT = 2;
+
     @Inject(method = "makeBoundingBox(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/AABB;",
             at = @At("HEAD"), cancellable = true)
     private void stature$shapedBox(Vec3 position, CallbackInfoReturnable<AABB> cir) {
@@ -89,8 +104,7 @@ public abstract class EntityMixin {
     }
 
     @Inject(method = "saveWithoutId", at = @At("TAIL"))
-    private void stature$saveSize(ValueOutput output, CallbackInfo info) {
-        if (!((Object) this instanceof StatureScale scaled)) {
+    private void stature$saveSize(ValueOutput output, CallbackInfo info) {        if (!((Object) this instanceof StatureScale scaled)) {
             return;
         }
 
@@ -100,7 +114,8 @@ public abstract class EntityMixin {
         FrameSource source = scaled.stature$frameSource();
 
         if (axes.isUniform() && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null
-                && (source == FrameSource.NONE || source == FrameSource.DEFAULT)) {
+                && (source == FrameSource.NONE || source == FrameSource.DEFAULT)
+                && scaled.stature$channelOverrides().isEmpty()) {
             return;
         }
 
@@ -119,6 +134,10 @@ public abstract class EntityMixin {
                 || source == FrameSource.TAG || source == FrameSource.TYPE) {
             output.putString(KEY_SOURCE, source.name());
         }
+        output.putInt(KEY_FORMAT, SAVE_FORMAT);
+
+        // Overrides travel; easing progress does not. A load lands, it never resumes a glide.
+        ChannelService.save((LivingEntity) (Object) this, output);
     }
 
     @Inject(method = "load", at = @At("TAIL"))
@@ -141,8 +160,14 @@ public abstract class EntityMixin {
             }
         }).orElse(null);
 
+        // Channels ride separately from the box: an entity can carry overrides with a vanilla
+        // box, and that alone must keep it out of the early return below.
+        boolean channels = scaled instanceof LivingEntity living
+                ? ChannelService.load(living, input)
+                : false;
+
         if (width == 1.0F && height == 1.0F && depth == 1.0F
-                && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null && source == null) {
+                && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null && source == null && !channels) {
             return;
         }
 
@@ -150,6 +175,21 @@ public abstract class EntityMixin {
             // Saves written before sources were tracked still need their meaning back: a named frame
             // came from an explicit choice, while stray nonuniform numbers came from a hand choice.
             source = frame != null ? FrameSource.COMMAND : FrameSource.MANUAL;
+        }
+
+        if (input.getIntOr(KEY_FORMAT, 1) < SAVE_FORMAT
+                && !((Entity) (Object) this).level().isClientSide()
+                && scaled instanceof LivingEntity living) {
+            // One release wrote reach and step straight into attribute bases, multiplying the
+            // registered default instead of the entity's own base -- and a base, once written, is
+            // what the save faithfully carries back. Anything stamped before the modifier regime
+            // gets those three bases restored to the registered defaults, guarded so a pristine
+            // base is never touched: without the repair the stale base would double-count against
+            // the new modifiers forever, and the custom it could destroy was already unrecoverable
+            // (the old code replaced it on every apply without ever storing it).
+            resetBase(living, Attributes.BLOCK_INTERACTION_RANGE);
+            resetBase(living, Attributes.ENTITY_INTERACTION_RANGE);
+            resetBase(living, Attributes.STEP_HEIGHT);
         }
 
         try {
@@ -171,13 +211,32 @@ public abstract class EntityMixin {
         // A load restores the server's truth, but nobody tells the clients: broadcasts only fire
         // on change, and StartTracking never fires for your own player entity. Flag players for
         // the tick-hook re-send, and broadcast now for the mob case, where tracking picks it up.
+        // Each half travels only when it has something to say: a channels-only entity sends no
+        // box packet, and a box-only entity sends no channel packet.
         boolean custom = frame != null || eyeHeight != StatureScale.NO_EYE_HEIGHT
                 || width != 1.0F || height != 1.0F || depth != 1.0F;
-        if (custom && !self.level().isClientSide() && scaled instanceof LivingEntity living) {
-            if (scaled instanceof ServerPlayer) {
+        if (!self.level().isClientSide() && scaled instanceof LivingEntity living) {
+            if (scaled instanceof ServerPlayer && (custom || channels)) {
                 scaled.stature$setNeedsSync(true);
             }
-            StatureNetworking.broadcast(living, ScaleService.stateOf(living));
+            if (custom) {
+                StatureNetworking.broadcast(living, ScaleService.stateOf(living));
+            }
+            if (channels) {
+                StatureNetworking.broadcast(living, ChannelService.syncMap(living));
+            }
+        }
+    }
+
+    /** Restores one attribute base to its registered default, touching nothing already there. */
+    private static void resetBase(LivingEntity entity, Holder<Attribute> attribute) {
+        AttributeInstance instance = entity.getAttribute(attribute);
+        if (instance == null) {
+            return;
+        }
+        double def = attribute.value().getDefaultValue();
+        if (instance.getBaseValue() != def) {
+            instance.setBaseValue(def);
         }
     }
 }

@@ -2,6 +2,7 @@ package dev.ellipog.stature.common.mixin.client;
 
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.client.StatureRenderState;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -47,7 +48,11 @@ public abstract class LivingEntityRendererMixin {
     private void stature$copyShapeOntoState(
             LivingEntity entity, LivingEntityRenderState state, float partialTicks, CallbackInfo info) {
         if (entity instanceof StatureScale scaled && state instanceof StatureRenderState render) {
-            render.stature$pushFrame(entity.tickCount, partialTicks, entity.getScale(), scaled.stature$axes());
+            // The model channel replaces the attribute scale as the visual base: unset, the
+            // override is absent and this is exactly entity.getScale(), so vanilla-sized drawing
+            // is bit-for-bit what it was; set, the picture separates from the box on purpose.
+            render.stature$pushFrame(entity.tickCount, partialTicks,
+                    ChannelService.visualScale(entity, entity.getScale()), scaled.stature$axes());
         }
     }
 

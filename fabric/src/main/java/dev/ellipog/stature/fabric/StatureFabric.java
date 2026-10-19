@@ -1,9 +1,11 @@
 package dev.ellipog.stature.fabric;
 
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
 import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.net.AxesPayload;
+import dev.ellipog.stature.common.net.ChannelsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.fabricmc.api.ModInitializer;
@@ -41,6 +43,7 @@ public final class StatureFabric implements ModInitializer {
         // 26.3 renamed the play registry: it is clientboundPlay()/serverboundPlay() now, not the
         // playS2C()/playC2S() pair that the older Fabric API used.
         PayloadTypeRegistry.clientboundPlay().register(AxesPayload.TYPE, AxesPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC);
         StatureNetworking.install(new FabricStatureNetwork());
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
@@ -49,6 +52,9 @@ public final class StatureFabric implements ModInitializer {
         EntityTrackingEvents.START_TRACKING.register((entity, player) -> {
             if (entity instanceof LivingEntity living) {
                 StatureNetworking.sendTo(player, living, ScaleService.stateOf(living));
+                if (ChannelService.hasSyncedState(living)) {
+                    StatureNetworking.sendTo(player, living, ChannelService.syncMap(living));
+                }
             }
         });
 

@@ -13,5 +13,10 @@
     "stature.command.frame.unknown": "No frame named %s (try /stature frame list)",
     "stature.command.frame.list": "%s frame(s): %s",
     "stature.command.frame.list.empty": "No frames loaded: a pack declares them at data/<namespace>/stature/frames/<name>.json",
-    "stature.command.reload": "Reloaded %s frame(s); updated %s entities"
+    "stature.command.reload": "Reloaded %s frame(s); updated %s entities",
+    "stature.command.channel.set.success": "Set %s channel %s to %s",
+    "stature.command.channel.reset.success": "Reset %s channel %s to following the base",
+    "stature.command.channel.unknown": "No channel named %s (see /stature channel <targets> list)",
+    "stature.command.channel.badvalue": "Channel values must be finite numbers",
+    "stature.command.channel.list": "%s channels: %s"
 }

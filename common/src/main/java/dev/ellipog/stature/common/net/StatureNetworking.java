@@ -3,6 +3,8 @@ package dev.ellipog.stature.common.net;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.StatureScale;
 
+import java.util.Map;
+
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -27,6 +29,12 @@ public final class StatureNetworking {
 
         /** One player, for a state they have not been sent yet. */
         void sendTo(ServerPlayer player, AxesPayload payload);
+
+        /** Everyone who could see this entity, for its channel overrides. */
+        void broadcast(LivingEntity entity, ChannelsPayload payload);
+
+        /** One player, for channel overrides they have not been sent yet. */
+        void sendTo(ServerPlayer player, ChannelsPayload payload);
     }
 
     private static Network installed;
@@ -47,6 +55,18 @@ public final class StatureNetworking {
     public static void sendTo(ServerPlayer player, LivingEntity entity, ScaleState state) {
         if (installed != null) {
             installed.sendTo(player, payload(entity, state));
+        }
+    }
+
+    public static void broadcast(LivingEntity entity, Map<String, Float> channels) {
+        if (installed != null) {
+            installed.broadcast(entity, new ChannelsPayload(entity.getId(), channels));
+        }
+    }
+
+    public static void sendTo(ServerPlayer player, LivingEntity entity, Map<String, Float> channels) {
+        if (installed != null) {
+            installed.sendTo(player, new ChannelsPayload(entity.getId(), channels));
         }
     }
 

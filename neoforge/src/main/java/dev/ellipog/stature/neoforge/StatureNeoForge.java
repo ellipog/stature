@@ -2,9 +2,12 @@ package dev.ellipog.stature.neoforge;
 
 import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
 import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.net.AxesPayload;
+import dev.ellipog.stature.common.net.ChannelsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -49,6 +52,14 @@ public final class StatureNeoForge {
                             if (entity instanceof LivingEntity living) {
                                 ScaleService.applyFromServer(living, payload.state(), payload.eyeHeight());
                             }
+                        })).playToClient(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC,
+                        (payload, context) -> context.enqueueWork(() -> {
+                            Entity entity = context.player().level().getEntity(payload.entityId());
+                            if (entity instanceof LivingEntity living) {
+                                StatureScale duck = (StatureScale) living;
+                                duck.stature$channelOverrides().clear();
+                                duck.stature$channelOverrides().putAll(payload.channels());
+                            }
                         })));
 
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) ->
@@ -58,6 +69,9 @@ public final class StatureNeoForge {
         NeoForge.EVENT_BUS.addListener((PlayerEvent.StartTracking event) -> {
             if (event.getEntity() instanceof ServerPlayer player && event.getTarget() instanceof LivingEntity living) {
                 StatureNetworking.sendTo(player, living, ScaleService.stateOf(living));
+                if (ChannelService.hasSyncedState(living)) {
+                    StatureNetworking.sendTo(player, living, ChannelService.syncMap(living));
+                }
             }
         });
 

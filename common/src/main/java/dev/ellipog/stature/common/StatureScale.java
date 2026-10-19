@@ -4,7 +4,10 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
+import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.common.frame.FrameSource;
+
+import java.util.Map;
 
 import net.minecraft.resources.Identifier;
 
@@ -78,6 +81,24 @@ public interface StatureScale {
     boolean stature$needsSync();
 
     void stature$setNeedsSync(boolean needsSync);
+
+    /**
+     * This entity's channel overrides, live.
+     *
+     * <p>Empty for almost every entity, which is the point: an unset channel follows the base
+     * scale for free, so only deliberate choices are stored. Read and write these through
+     * {@code ChannelService}, not directly -- the service keeps transitions, effects, saves and
+     * packets in step with the map, and a hand edit to the map alone updates none of those.
+     */
+    Map<String, Float> stature$channelOverrides();
+
+    /**
+     * This entity's in-flight channel changes, live.
+     *
+     * <p>Same deal as the overrides: the service owns the lifecycle, ticking these and applying
+     * their effects, and a hand edit here bypasses all of that.
+     */
+    Map<String, ChannelTransition> stature$channelTransitions();
 
     /** The frame's eye height in blocks at scale 1, or {@link #NO_EYE_HEIGHT}. */
     float stature$eyeHeight();

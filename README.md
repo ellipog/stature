@@ -78,11 +78,12 @@ be narrower than it is tall or deeper than it is wide.
 ```
 
 The scale itself rides the game's own `scale` attribute, so pathfinding, collision and camera
-height come with it; reach and step are written from *their own defaults* times the scale, never
-from their current value, so repeated writes cannot compound. The shape cannot ride an attribute --
-vanilla's dimensions are one width used for both X and Z -- so it lives on the entity and is sent to
-clients over a packet of Stature's own, which is what keeps a client's box from disagreeing with the
-server's.
+height come with it. Everything a scale should drag along -- reach, step, motion, damage, hearts
+and thirty-odd friends -- is a channel: unset, each follows the base scale by its own exponent
+(motion goes with the square root, reach goes linear); set, it reads exactly what it says.
+Attribute channels apply as transient modifiers onto the entity's own base, never by replacing
+it, so a zombie's 0.23 speed and a modded creature's custom reach both survive being scaled, and
+removing the modifier restores pristine behavior with nothing stored anywhere.
 
 Verified on a 26.3 dedicated server, on **both loaders**. The first three rows are identical on
 Fabric and NeoForge; the fourth is one sample taken while the shape was still easing, so its exact
@@ -98,6 +99,27 @@ numbers depend on when it was read.
 Physics: the box is rebuilt on the same tick as the write, rather than a tick later when vanilla's
 own poll would notice. Depth is verified rather than assumed -- `0.300` wide against `1.200` deep
 cannot be the width used twice.
+
+## Channels
+
+Thirty-eight named things a scale can drive, each following the base unless overridden:
+
+```cmd
+/stature channel <targets> list                       what each channel says
+/stature channel <targets> <channel> <value>          set one channel now
+/stature channel <targets> <channel> reset            back to following the base
+```
+
+```cmd
+/stature set @e[type=minecraft:zombie,limit=1] 2.0
+/stature channel @e[type=minecraft:zombie,limit=1] list
+```
+
+shows `motion` at 1.414 with everything linear at 2.000, and the zombie's speed attribute reads
+0.325: its own 0.23 base times the root of two, not a replaced number. Overrides are absolute --
+`motion 2.0` means a speed of 2.0 -- eased when set through the API, saved with the entity, and
+synced to viewers. Entries the operator set carry an `(override)` mark in the list. Mods declare their own channels through `ChannelRegistry`; anything outside
+`stature:` ships experimental, so the surface can grow without freezing a bad idea.
 
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied

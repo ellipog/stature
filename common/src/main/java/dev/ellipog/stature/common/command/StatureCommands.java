@@ -1,7 +1,10 @@
 package dev.ellipog.stature.common.command;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import com.mojang.brigadier.CommandDispatcher;
@@ -19,6 +22,9 @@ import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleLimits;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelRegistry;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
 
@@ -44,6 +50,9 @@ import org.jetbrains.annotations.Nullable;
  * /stature frame  apply &lt;targets&gt; &lt;frame&gt; [ticks]            a frame from a data pack
  * /stature frame  clear &lt;targets&gt;                            back to vanilla proportions
  * /stature frame  list                                       what the packs declared
+ * /stature channel &lt;targets&gt; &lt;channel&gt; &lt;value&gt;           set one channel now
+ * /stature channel &lt;targets&gt; &lt;channel&gt; reset               back to following the base
+ * /stature channel &lt;targets&gt; list                          what each channel says
  * /stature get    [&lt;target&gt;]                                 the size and the resulting box
  * /stature reload                                            re-read the packs
  * </pre>
@@ -78,6 +87,7 @@ public final class StatureCommands {
         setBranch(root);
         sizeBranch(root);
         frameBranch(root);
+        channelBranch(root);
 
         root.then(Commands.literal("get")
                 .executes(context -> get(context, context.getSource().getEntity()))
@@ -146,6 +156,34 @@ public final class StatureCommands {
     }
 
     /**
+     * One channel at a time, set now rather than eased: a channel override is a decision about a
+     * number, and the service eases API-driven changes while the command states facts.
+     *
+     * <p>The value is deliberately unbounded -- §14.5 leaves numbers to the API, and the command
+     * refuses only what is not a number at all. A pack or a future frame field that wants an
+     * eased channel change calls the service, not this tree.
+     */
+    private static void channelBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
+        // Channel ids are namespace:path shaped, and StringArgumentType.string() is single-word:
+        // it stops at the colon and the parse dies there. IdentifierArgument speaks the same shape
+        // as the frame argument two branches up, so both id arguments behave the same way.
+        RequiredArgumentBuilder<CommandSourceStack, Identifier> channel =
+                Commands.argument("channel", IdentifierArgument.id())
+                        .suggests(StatureCommands::suggestChannels);
+
+        RequiredArgumentBuilder<CommandSourceStack, Double> value =
+                Commands.argument("value", DoubleArgumentType.doubleArg())
+                        .executes(StatureCommands::setChannel);
+
+        root.then(Commands.literal("channel")
+                .then(Commands.argument("targets", EntityArgument.entities())
+                        .then(Commands.literal("list").executes(StatureCommands::listChannels))
+                        .then(channel
+                                .then(value)
+                                .then(Commands.literal("reset").executes(StatureCommands::resetChannel)))));
+    }
+
+    /**
      * One named easing, as a literal branch of the tree.
      *
      * <p>A literal per curve rather than a parsed string: the command tree then <em>is</em> the list
@@ -205,6 +243,84 @@ public final class StatureCommands {
             CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
         return SharedSuggestionProvider.suggest(
                 StatureFrames.ids().stream().map(Identifier::toString).sorted().toList(), builder);
+    }
+
+    /** The declared channel names, offered as completions. Never empty: built-ins ship. */
+    private static CompletableFuture<Suggestions> suggestChannels(
+            CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+        return SharedSuggestionProvider.suggest(ChannelRegistry.instance().ids(), builder);
+    }
+
+    private static int setChannel(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+        String id = IdentifierArgument.getId(context, "channel").toString();
+        float value = (float) DoubleArgumentType.getDouble(context, "value");
+
+        // Two different refusals, said differently: a name nobody declared, or a number that is
+        // not a number. The service would throw the first too, but "try list" belongs to the
+        // command, which is what knows the list exists.
+        if (ChannelRegistry.instance().get(id) == null) {
+            context.getSource().sendFailure(Component.translatable("stature.command.channel.unknown", id));
+            return 0;
+        }
+        if (!Float.isFinite(value)) {
+            context.getSource().sendFailure(Component.translatable("stature.command.channel.badvalue"));
+            return 0;
+        }
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            ChannelService.setChannel(living, id, value, 0, Easing.LINEAR);
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.channel.set.success",
+                            living.getDisplayName(), id, number(value)),
+                    true);
+        }
+        return report(context, changed);
+    }
+
+    private static int resetChannel(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+        String id = IdentifierArgument.getId(context, "channel").toString();
+
+        if (ChannelRegistry.instance().get(id) == null) {
+            context.getSource().sendFailure(Component.translatable("stature.command.channel.unknown", id));
+            return 0;
+        }
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            ChannelService.resetChannel(living, id);
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.channel.reset.success", living.getDisplayName(), id),
+                    true);
+        }
+        return report(context, changed);
+    }
+
+    private static int listChannels(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+
+        int listed = 0;
+        for (LivingEntity living : living(targets)) {
+            Set<String> overrides =
+                    ((StatureScale) living).stature$channelOverrides().keySet();
+            List<String> entries = new ArrayList<>();
+            for (String id : ChannelRegistry.instance().ids()) {
+                String entry = id + "=" + number(ChannelService.resolvedValue(living, id));
+                entries.add(overrides.contains(id) ? entry + " (override)" : entry);
+            }
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.channel.list", living.getDisplayName(), String.join(", ", entries)),
+                    false);
+            listed++;
+        }
+        return report(context, listed);
     }
 
     private static int applyFrame(CommandContext<CommandSourceStack> context, int ticks) throws CommandSyntaxException {

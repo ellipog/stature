@@ -4,11 +4,16 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
+import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
 import dev.ellipog.stature.common.net.StatureNetworking;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
@@ -60,6 +65,12 @@ public abstract class LivingEntityMixin implements StatureScale {
 
     @Unique
     private boolean stature$needsSync;
+
+    @Unique
+    private Map<String, Float> stature$channelOverrides;
+
+    @Unique
+    private Map<String, ChannelTransition> stature$channelTransitions;
 
     @Unique
     private float stature$eyeHeight = NO_EYE_HEIGHT;
@@ -118,6 +129,22 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Override
+    public Map<String, Float> stature$channelOverrides() {
+        if (this.stature$channelOverrides == null) {
+            this.stature$channelOverrides = new LinkedHashMap<>();
+        }
+        return this.stature$channelOverrides;
+    }
+
+    @Override
+    public Map<String, ChannelTransition> stature$channelTransitions() {
+        if (this.stature$channelTransitions == null) {
+            this.stature$channelTransitions = new LinkedHashMap<>();
+        }
+        return this.stature$channelTransitions;
+    }
+
+    @Override
     public float stature$eyeHeight() {
         return this.stature$eyeHeight;
     }
@@ -146,6 +173,7 @@ public abstract class LivingEntityMixin implements StatureScale {
         LivingEntity self = (LivingEntity) (Object) this;
         if (!self.level().isClientSide()) {
             FrameService.ensureAssigned(self);
+            ChannelService.tick(self);
             stature$syncSelf(self);
         }
         if (this.stature$transition == null || this.stature$transition.isDone()) {
@@ -161,7 +189,7 @@ public abstract class LivingEntityMixin implements StatureScale {
      * own entity never triggers tracking, so after a relog -- or a dimension hop, or a dropped
      * packet -- you would see yourself vanilla while the server has you shaped. The flag covers the
      * load itself; the twenty-tick cadence covers everything the flag can miss, for one small
-     * packet a second per customized player.
+     * packet a second per customized player. Channel state rides along whenever there is any.
      */
     @Unique
     private void stature$syncSelf(LivingEntity self) {
@@ -172,6 +200,9 @@ public abstract class LivingEntityMixin implements StatureScale {
         this.stature$needsSync = false;
         if (FrameService.isCustomized(self)) {
             StatureNetworking.sendTo(player, self, ScaleService.stateOf(self));
+        }
+        if (ChannelService.hasSyncedState(self)) {
+            StatureNetworking.sendTo(player, self, ChannelService.syncMap(self));
         }
     }
 

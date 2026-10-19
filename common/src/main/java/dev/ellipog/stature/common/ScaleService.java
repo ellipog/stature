@@ -4,6 +4,7 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleLimits;
 import dev.ellipog.stature.api.ScaleState;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.core.Holder;
@@ -71,6 +72,11 @@ public final class ScaleService {
         write(entity, Attributes.ENTITY_INTERACTION_RANGE, scale, true);
         write(entity, Attributes.STEP_HEIGHT, scale, true);
 
+        // The channel layer always has the last word on these three and the rest of the table:
+        // with no overrides set its word is exactly the backbone's, which the equality skip in
+        // the write turns into a no-op, so a frame-less world pays nothing for the table.
+        ChannelService.applyAttributes(entity);
+
         StatureScale duck = (StatureScale) entity;
         boolean shapeChanged = !duck.stature$axes().equals(state.axes());
         duck.stature$setAxes(state.axes());
@@ -116,9 +122,10 @@ public final class ScaleService {
     /**
      * Writes one attribute, if this entity has it at all.
      *
-     * <p>Not every entity has every attribute -- {@code entity_interaction_range} is a living
-     * entity's, and a modded creature may have none of the three -- so a missing one is skipped
-     * rather than treated as an error.
+     * <p>Only the uniform scale is written here now: every other attribute belongs to a channel,
+     * whose multiplier modifiers compose onto the entity's own base instead of replacing it. Not
+     * every entity has every attribute, so a missing one is skipped rather than treated as an
+     * error.
      */
     private static void write(LivingEntity entity, Holder<Attribute> attribute, float scale, boolean timesDefault) {
         AttributeInstance instance = entity.getAttribute(attribute);

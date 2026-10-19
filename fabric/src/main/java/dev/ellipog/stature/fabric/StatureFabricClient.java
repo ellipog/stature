@@ -1,7 +1,9 @@
 package dev.ellipog.stature.fabric;
 
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.net.AxesPayload;
+import dev.ellipog.stature.common.net.ChannelsPayload;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -28,6 +30,20 @@ public final class StatureFabricClient implements ClientModInitializer {
                     Entity entity = context.client().level.getEntity(payload.entityId());
                     if (entity instanceof LivingEntity living) {
                         ScaleService.applyFromServer(living, payload.state(), payload.eyeHeight());
+                    }
+                }));
+        ClientPlayNetworking.registerGlobalReceiver(ChannelsPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().level == null) {
+                        return;
+                    }
+                    Entity entity = context.client().level.getEntity(payload.entityId());
+                    if (entity instanceof LivingEntity living) {
+                        // Full replace, never merge: a key missing here was removed there, and a
+                        // merge would keep the dead key forever.
+                        StatureScale duck = (StatureScale) living;
+                        duck.stature$channelOverrides().clear();
+                        duck.stature$channelOverrides().putAll(payload.channels());
                     }
                 }));
     }
