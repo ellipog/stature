@@ -1,0 +1,61 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+base {
+    archivesName = "${mod_id}-api-${minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+    withSourcesJar()
+}
+
+// This module does not apply the multiloader-common convention (that is for modules with
+// Minecraft on the classpath), so it declares the one repository its tests need itself.
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+
+    testLogging {
+        // Full exception text. A failure that says "expected true but was false" without the
+        // values is a test you have to re-run to understand, which is most of the point wasted.
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat 'full'
+        showStackTraces = true
+    }
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifactId base.archivesName.get()
+            from components.java
+        }
+    }
+    repositories {
+        // Same localRepo layout as the other modules, so publishToLocalRepo collects all four.
+        maven {
+            name = 'localRepo'
+            url = rootProject.layout.buildDirectory.dir('repo')
+        }
+
+        def remote = System.getenv('local_maven_url')
+        if (remote) {
+            maven {
+                name = 'external'
+                url = remote
+            }
+        }
+    }
+}

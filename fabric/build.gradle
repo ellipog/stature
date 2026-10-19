@@ -1,0 +1,38 @@
+plugins {
+    id 'multiloader-loader'
+    id 'net.fabricmc.fabric-loom'
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // No mappings block: 26.x is unobfuscated (official Mojang names are the names), and Loom
+    // refuses layered mappings in a non-obfuscated environment. Parchment publishes nothing
+    // for 26.x either, so there is nothing to layer.
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    // :api travels with the loader because these sources name it (see multiloader-loader.gradle:
+    // common's sources are recompiled here, and its `implementation project(':api')` does not
+    // cross the project boundary on its own).
+    implementation project(':api')
+}
+
+loom {
+    // No `mixin` block: Loom 1.17 disabled the mixin annotation processor by default and says to
+    // remove the configuration. Nothing is lost on 26.x, which is unobfuscated: spike-s2/ proved
+    // mixins apply with no refmap at all, because there are no obfuscated names to map back.
+    // If a refmap is ever genuinely needed, that is `useLegacyMixinAp = true`, not this block.
+    runs {
+        client {
+            client()
+            setConfigName('Fabric Client')
+            ideConfigGenerated(true)
+            runDir('runs/client')
+        }
+        server {
+            server()
+            setConfigName('Fabric Server')
+            ideConfigGenerated(true)
+            runDir('runs/server')
+        }
+    }
+}

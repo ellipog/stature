@@ -1,0 +1,50 @@
+// Stature spike S2. Throwaway: this answers one question and is deleted afterwards.
+//
+// Deliberately one module and no buildSrc, unlike armature/ and tenet/. The spike exists to prove
+// that the mixins apply and that a rectangular box survives a tick, and a multiloader scaffold would
+// be more moving parts than the question has. NeoForge is not here for the same reason: a mixin that
+// applies under Fabric is a platform answer, and the NeoForge answer is a second afternoon.
+plugins {
+    // The no-remap Loom plugin id, same plugin and version as armature/. 26.x is unobfuscated, so
+    // there are no mappings, no remapJar, and `implementation` rather than `modImplementation`.
+    id 'net.fabricmc.fabric-loom' version '1.17.21'
+}
+
+group = 'dev.ellipog'
+version = '0.0.1'
+base { archivesName = 'stature-spike-s2' }
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // No mappings block: 26.x is unobfuscated with official Mojang names, and Loom refuses layered
+    // mappings in a non-obfuscated environment. Parchment publishes nothing for 26.x either.
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(java_version as int)
+    }
+}
+
+loom {
+    runs {
+        server {
+            server()
+            setConfigName('Spike S2 Server')
+            ideConfigGenerated(true)
+            runDir('runs/server')
+        }
+        client {
+            client()
+            setConfigName('Spike S2 Client')
+            ideConfigGenerated(true)
+            runDir('runs/client')
+        }
+    }
+}

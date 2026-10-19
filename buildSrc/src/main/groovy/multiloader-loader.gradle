@@ -1,0 +1,79 @@
+plugins {
+    id 'multiloader-common'
+}
+
+configurations {
+    commonJava{
+        canBeResolved = true
+    }
+    commonResources{
+        canBeResolved = true
+    }
+}
+
+dependencies {
+    compileOnly(project(':common')) {
+        capabilities {
+            requireCapability "$group:$mod_id"
+        }
+    }
+    commonJava project(path: ':common', configuration: 'commonJava')
+    commonResources project(path: ':common', configuration: 'commonResources')
+}
+
+tasks.named('compileJava', JavaCompile) {
+    dependsOn(configurations.commonJava)
+    source(configurations.commonJava)
+}
+
+processResources {
+    dependsOn(configurations.commonResources)
+    from(configurations.commonResources)
+}
+
+tasks.named('javadoc', Javadoc).configure {
+    dependsOn(configurations.commonJava)
+    source(configurations.commonJava)
+}
+
+tasks.named('sourcesJar', Jar) {
+    dependsOn(configurations.commonJava)
+    from(configurations.commonJava)
+    dependsOn(configurations.commonResources)
+    from(configurations.commonResources)
+}
+
+// ---------------------------------------------------------------------------
+// Headless tests for the loader modules.
+//
+// :common carries the suite, but the loader seam -- events, registrars, adapters -- had no
+// runnable tests at all: nothing can run what Gradle does not know. The test source set
+// inherits main's already-resolved classpath (the same trick :common uses: Minecraft arrives
+// through the loader toolchain's own configuration), plus JUnit. Loader APIs (fabric-api,
+// the NeoForge capability jars) travel with main's classpath, so adapter classes
+// load; the game itself is never launched.
+// ---------------------------------------------------------------------------
+sourceSets {
+    test {
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+
+dependencies {
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+
+    testLogging {
+        // Full exception text. A failure that says "expected true but was false" without the
+        // values is a test you have to re-run to understand, which is most of the point wasted.
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat 'full'
+        showStackTraces = true
+    }
+}

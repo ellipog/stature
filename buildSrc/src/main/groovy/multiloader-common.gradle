@@ -1,0 +1,145 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+base {
+    archivesName = "${mod_id}-${project.name}-${minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+    withSourcesJar()
+    // withJavadocJar() is deliberately absent.
+    //
+    // The template ships it, and for a mod it earns nothing: the jar is never published and
+    // never opened, this code is full of mojmap type names nobody can javadoc usefully, and
+    // it emitted 60-odd warnings on every single build -- enough that a real compiler error
+    // was hard to pick out of the noise. It also failed outright once on a stale file left
+    // by a killed build, which is a build-breaking task whose output nobody wants.
+    //
+    // "gradlew javadoc" still works when someone does want it.
+}
+
+repositories {
+    mavenCentral()
+    // https://docs.gradle.org/current/userguide/declaring_repositories.html#declaring_content_exclusively_found_in_one_repository
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Sponge'
+                url = 'https://repo.spongepowered.org/repository/maven-public'
+            }
+        }
+        filter { includeGroupAndSubgroups('org.spongepowered') }
+    }
+
+    // (A ParchmentMC repository block lived here until the 26.3 port: 26.x is unobfuscated and
+    // Parchment publishes nothing for it, so there is nothing left to resolve from it.)
+    //
+    // Stature has no third-party dependencies at all: no parties mod, no energy library, nothing
+    // a consumer must have on its own classpath. If one ever earns its place, this is where its
+    // repository goes, and the declaration goes here rather than in a module -- because the loader
+    // projects *recompile common's sources* (see multiloader-loader.gradle), so a declaration in
+    // common alone would leave both loader projects unable to find the package.
+}
+
+// Declare capabilities on the outgoing configurations.
+// Read more about capabilities here: https://docs.gradle.org/current/userguide/component_capabilities.html#sec:declaring-additional-capabilities-for-a-local-component
+// Nothing here consumes these. They exist for Stature's own loader projects, which require
+// the "$group:$mod_id" capability so that a loader can pull in common's classes without
+// dragging in common's compileOnly dependencies.
+['apiElements', 'runtimeElements', 'sourcesElements'].each { variant ->
+    configurations."$variant".outgoing {
+        capability("$group:${base.archivesName.get()}:$version")
+        capability("$group:$mod_id-${project.name}-${minecraft_version}:$version")
+        capability("$group:$mod_id:$version")
+    }
+    publishing.publications.configureEach {
+        suppressPomMetadataWarningsFor(variant)
+    }
+}
+
+sourcesJar {
+    from(rootProject.file('LICENSE')) {
+        rename { "${it}_${mod_name}" }
+    }
+}
+
+jar {
+    from(rootProject.file('LICENSE')) {
+        rename { "${it}_${mod_name}" }
+    }
+
+    manifest {
+        attributes([
+                'Specification-Title'   : mod_name,
+                'Specification-Vendor'  : mod_author,
+                'Specification-Version' : project.jar.archiveVersion,
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.jar.archiveVersion,
+                'Implementation-Vendor' : mod_author,
+                'Built-On-Minecraft'    : minecraft_version
+        ])
+    }
+}
+
+processResources {
+    var expandProps = [
+            'version'                      : version,
+            'group'                        : project.group, //Else we target the task's group.
+            'minecraft_version'            : minecraft_version,
+            'minecraft_version_range'      : minecraft_version_range,
+            'fabric_version'               : fabric_version,
+            'fabric_loader_version'        : fabric_loader_version,
+            'mod_name'                     : mod_name,
+            'mod_author'                   : mod_author,
+            'mod_id'                       : mod_id,
+            'license'                      : license,
+            'description'                  : project.description,
+            'neoforge_version'             : neoforge_version,
+            'neoforge_loader_version_range': neoforge_loader_version_range,
+            'credits'                      : credits,
+            'java_version'                 : java_version
+    ]
+
+    filesMatching(['pack.mcmeta', 'fabric.mod.json', 'META-INF/mods.toml', 'META-INF/neoforge.mods.toml', '*.mixins.json']) {
+        expand expandProps
+    }
+    inputs.properties(expandProps)
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifactId base.archivesName.get()
+            from components.java
+        }
+    }
+    repositories {
+        // The Maven tree the release workflow uploads to maven.ellipog.dev. One directory, holding
+        // every module, in the layout a repository expects -- so uploading is a copy and nothing has
+        // to know what a Maven repository is. `gradlew publishToLocalRepo` is the one command.
+        //
+        // A *file* repository rather than an HTTP one on purpose: the upload is a separate step,
+        // and this stays the same whether the target is a bucket or a directory somebody copies
+        // by hand. The root project's build directory, not this project's. This convention is applied
+        // to every subproject, so `layout.buildDirectory` would put one module in each of several
+        // places -- three trees, each holding part of a repository. The upload wants one.
+        maven {
+            name = 'localRepo'
+            url = rootProject.layout.buildDirectory.dir('repo')
+        }
+
+        // A hand-run push somewhere else, when local_maven_url is set. Only declared when there is
+        // a URL: a repository with a null url is a repository Gradle cannot publish to, and leaving
+        // one in the list made `publish` a landmine rather than an omission.
+        def remote = System.getenv('local_maven_url')
+        if (remote) {
+            maven {
+                name = 'external'
+                url = remote
+            }
+        }
+    }
+}

@@ -1,0 +1,115 @@
+plugins {
+    // see https://fabricmc.net/develop/ for new versions. 26.x is unobfuscated, so this is the
+    // no-remap plugin id; modImplementation/modCompileOnly/remapJar do not exist here -- the
+    // standard implementation/compileOnly/jar configurations are used instead (see fabric/build.gradle
+    // and the deploy tasks below). 1.17.x is the line Fabric validated for 26.3 (with Gradle 9.6.0);
+    // 1.18.x wants Gradle 9.7+ and is not taken here.
+    id 'net.fabricmc.fabric-loom' version '1.17.21' apply false
+    // see https://projects.neoforged.net/neoforged/moddevgradle for new versions
+    id 'net.neoforged.moddev' version '2.0.148' apply false
+}
+
+// ---------------------------------------------------------------------------
+// Local test deploy.
+//
+// Copies the built jars straight into the Modrinth App profiles named in
+// gradle.properties, so testing is one command. Each task deletes the previous
+// copies first -- otherwise an old jar sits next to the new one and Minecraft
+// loads whichever it happens to pick.
+// ---------------------------------------------------------------------------
+
+def archivePrefix = mod_id
+
+def registerDeploy = { String taskName, String subproject, String jarTask, String dirProperty ->
+    def configured = project.findProperty(dirProperty)
+    def sub = project.project(":${subproject}")
+
+    tasks.register(taskName) {
+        group = 'deploy'
+        description = "Build :${subproject} and copy the resulting jar into ${dirProperty}."
+        dependsOn "${subproject}:${jarTask}"
+
+        doLast {
+            if (configured == null) {
+                throw new GradleException("${dirProperty} is not set in gradle.properties")
+            }
+
+            // Resolved here rather than where the task is registered, and that is not tidiness. This
+            // is a path on *this* machine, and `project.file()` on a Windows path containing a space
+            // throws URISyntaxException -- on Linux, during *configuration*, which fails every task
+            // in the build rather than only this one. A CI runner wants `build` and never this path,
+            // and it could not configure the project at all until the two were separated.
+            def modsDir = project.file(configured)
+
+            def built = sub.tasks.named(jarTask).get().archiveFile.get().asFile
+            if (!built.exists()) {
+                throw new GradleException("No jar at ${built} -- did :${subproject}:${jarTask} run?")
+            }
+
+            modsDir.mkdirs()
+
+            def stale = modsDir.listFiles(new FilenameFilter() {
+                boolean accept(File dir, String name) {
+                    return name.startsWith(archivePrefix + '-') && name.endsWith('.jar')
+                }
+            })
+            stale?.each {
+                println "deploy: removing old ${it.name}"
+                if (!it.delete()) {
+                    logger.warn("deploy: could not delete ${it}")
+                }
+            }
+
+            def target = new File(modsDir, built.name)
+            try {
+                java.nio.file.Files.copy(built.toPath(), target.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                println "deploy: ${built.name} -> ${target}"
+            }
+            catch (java.nio.file.FileSystemException e) {
+                // By far the commonest cause: Minecraft is running and holds this jar open. Windows
+                // refuses to overwrite an open file, and the exception names the *jar* rather than the
+                // game -- so it reads as a permissions problem on a path nobody deliberately chose.
+                //
+                // A warning rather than a failure, deliberately. The other things a deploy does are still
+                // worth doing, and failing here stops all of them. What must NOT happen is pretending
+                // it worked, so the wording is blunt about it.
+                logger.warn("deploy: SKIPPED ${target.name}")
+                logger.warn("deploy:   ${e.reason ?: 'the file is locked'}")
+                logger.warn("deploy:   ${target}")
+                logger.warn("deploy:   Something is holding this file open -- usually Minecraft, and not")
+                logger.warn("deploy:   necessarily: this has been seen with no java.exe running at all.")
+                logger.warn("deploy:   Close the game and anything else that has scanned the folder, then")
+                logger.warn("deploy:   re-run.")
+            }
+        }
+    }
+}
+
+registerDeploy('deployFabric',   'fabric',   'jar', 'testModsDirFabric')
+registerDeploy('deployNeoForge', 'neoforge', 'jar',      'testModsDirNeoForge')
+
+tasks.register('deployAll') {
+    group = 'deploy'
+    description = 'Deploy to both the Fabric and the NeoForge test profile.'
+    dependsOn 'deployFabric', 'deployNeoForge'
+}
+
+// ---------------------------------------------------------------------------
+// The Maven tree for the release workflow.
+//
+// `publishAllPublicationsToLocalRepoRepository` is the task Gradle generates for the `localRepo`
+// repository, once per subproject -- and that name is Gradle's spelling, not ours. This is the name
+// that says what it does, and it exists so the workflow does not have to know Gradle's name.
+//
+// Every module, not `:common` alone: a dev run's `runtimeOnly` resolves the loader modules, and
+// publishing only some of them is how the rest were once left behind at whatever version was last
+// pushed by hand.
+// ---------------------------------------------------------------------------
+tasks.register('publishToLocalRepo') {
+    group = 'publishing'
+    description = 'Publishes every module into build/repo, a Maven tree ready to upload.'
+    dependsOn {
+        subprojects.collect { "${it.path}:publishAllPublicationsToLocalRepoRepository" }
+    }
+}

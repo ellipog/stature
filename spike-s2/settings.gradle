@@ -1,0 +1,30 @@
+// Copied from armature/settings.gradle, which is the proven 26.3 toolchain on this machine.
+// The Fabric exclusiveContent block is not optional: the no-remap Loom plugin marker lives under
+// net.fabricmc.fabric-loom and its own transitives (unpick) fall through to Central and 404 without
+// the filters.
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'Fabric'
+                    url = uri('https://maven.fabricmc.net')
+                }
+            }
+            filter {
+                includeGroup('net.fabricmc')
+                includeGroup('fabric-loom')
+                includeGroup('net.fabricmc.fabric-loom')
+                includeGroup('net.fabricmc.unpick')
+            }
+        }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+rootProject.name = 'stature-spike-s2'

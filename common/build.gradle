@@ -1,0 +1,74 @@
+plugins {
+    id 'multiloader-common'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    neoFormVersion = neo_form_version
+    // No access-transformer block: 26.3 needs no widening.
+    // No parchment block: 26.x is unobfuscated, Parchment publishes nothing for it.
+}
+
+dependencies {
+    // :api is pure Java with no dependencies of its own, so it travels everywhere safely:
+    // an implementation dependency here, and the same line in both loader modules (which
+    // recompile these sources and would otherwise be missing the package).
+    implementation project(':api')
+
+    compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
+    // fabric and neoforge both bundle mixinextras, so it is safe to use it in common
+    compileOnly group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.3.5'
+    annotationProcessor group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.3.5'
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+//
+// These run headless on the JVM. Minecraft is already on `main`'s compile classpath via
+// ModDevGradle's NeoForm configuration, and `compileOnly` does not carry it to the test source
+// set -- so the test source set inherits the classpath `main` already resolves. That is
+// guaranteed to be the same set of jars, because it literally is the same list.
+//
+// What the tests may touch is math, not the game: positions, boxes, dimensions, curves. Anything
+// needing registries, a level or a loader belongs in a run, not in here.
+// ---------------------------------------------------------------------------
+sourceSets {
+    test {
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+
+dependencies {
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+
+    testLogging {
+        // Full exception text. A failure that says "expected true but was false" without the
+        // values is a test you have to re-run to understand, which is most of the point wasted.
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat 'full'
+        showStackTraces = true
+    }
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
