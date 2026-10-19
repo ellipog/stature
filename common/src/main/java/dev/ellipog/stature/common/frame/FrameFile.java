@@ -26,12 +26,14 @@ public record FrameFile(
         List<TagKey<EntityType<?>>> entityTags,
         String rig,
         Map<String, List<Float>> parts,
-        boolean hitboxFromParts) {
+        boolean hitboxFromParts,
+        List<FrameRegion> regions) {
 
     public FrameFile {
         entities = List.copyOf(entities);
         entityTags = List.copyOf(entityTags);
         parts = Map.copyOf(parts);
+        regions = List.copyOf(regions);
     }
 
     /** Whether this frame says anything about where it belongs. */
@@ -42,5 +44,10 @@ public record FrameFile(
     /** Whether this frame carries a silhouette. */
     public boolean hasParts() {
         return !this.parts.isEmpty();
+    }
+
+    /** Whether this frame names anywhere a hit lands differently. */
+    public boolean hasRegions() {
+        return !this.regions.isEmpty();
     }
 }

@@ -6,6 +6,7 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
 import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
+import dev.ellipog.stature.common.parts.HitRegion;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.parts.PartService;
@@ -29,6 +30,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -79,6 +81,12 @@ public abstract class LivingEntityMixin implements StatureScale {
 
     @Unique
     private Map<String, AxesTransition> stature$partTransitions;
+
+    @Unique
+    private HitRegion stature$incomingRegion;
+
+    @Unique
+    private HitRegion stature$lastHit;
 
     @Unique
     private float stature$eyeHeight = NO_EYE_HEIGHT;
@@ -169,6 +177,26 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Override
+    public HitRegion stature$incomingRegion() {
+        return this.stature$incomingRegion;
+    }
+
+    @Override
+    public void stature$setIncomingRegion(HitRegion region) {
+        this.stature$incomingRegion = region;
+    }
+
+    @Override
+    public HitRegion stature$lastHit() {
+        return this.stature$lastHit;
+    }
+
+    @Override
+    public void stature$setLastHit(HitRegion hit) {
+        this.stature$lastHit = hit;
+    }
+
+    @Override
     public float stature$eyeHeight() {
         return this.stature$eyeHeight;
     }
@@ -205,6 +233,33 @@ public abstract class LivingEntityMixin implements StatureScale {
             return;
         }
         ScaleService.apply(self, this.stature$transition.advance());
+    }
+
+    /**
+     * Spends a stashed hurt region on incoming damage.
+     *
+     * <p>The stash is honored only in its own tick: anything later is a different hit, and
+     * anything else ticking damage in between (fire, lava) must not inherit it. Spending
+     * records the last hit and clears the stash, in that order. The multiplier lands before
+     * armor and effects, so a weak point stays weak through plate.
+     *
+     * <p>Index 3 is the damage float, counted from the pinned signature: slot 0 is this,
+     * then level, source, damage in order. The contract test pins that order, so a Mojang
+     * reorder fails the build instead of scaling the wrong slot.
+     */
+    @ModifyVariable(
+            method = "hurtServer(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/damagesource/DamageSource;F)Z",
+            at = @At("HEAD"),
+            index = 3)
+    private float stature$scaleRegionDamage(float damage) {
+        LivingEntity self = (LivingEntity) (Object) this;
+        HitRegion region = this.stature$incomingRegion;
+        if (region == null || region.tick() != self.tickCount) {
+            return damage;
+        }
+        this.stature$incomingRegion = null;
+        this.stature$lastHit = region;
+        return damage * region.multiplier();
     }
 
     /**

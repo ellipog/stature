@@ -36,29 +36,32 @@ public final class RigRegistry {
 
     private static final String DEFAULT_ID = "stature:humanoid";
 
+    /** The whole entity box, used when a rig entry names no box of its own. */
+    public static final List<Float> FULL_BOX = List.of(0.0F, 0.0F, 0.0F, 1.0F, 1.0F, 1.0F);
+
     private static final RigRegistry INSTANCE = new RigRegistry();
 
-    private final Map<String, Map<String, List<String>>> rigs = new LinkedHashMap<>();
+    private final Map<String, Map<String, RigGroup>> rigs = new LinkedHashMap<>();
 
     public static RigRegistry instance() {
         return INSTANCE;
     }
 
     public RigRegistry() {
-        Map<String, List<String>> humanoid = new LinkedHashMap<>();
-        humanoid.put("head", List.of("head", "hat"));
-        humanoid.put("torso", List.of("body"));
-        humanoid.put("arm.left", List.of("left_arm"));
-        humanoid.put("arm.right", List.of("right_arm"));
-        humanoid.put("leg.left", List.of("left_leg"));
-        humanoid.put("leg.right", List.of("right_leg"));
-        humanoid.put("all", List.of(""));
+        Map<String, RigGroup> humanoid = new LinkedHashMap<>();
+        humanoid.put("head", new RigGroup(List.of("head", "hat"), List.of(0.0F, 0.72F, 0.0F, 1.0F, 1.0F, 1.0F)));
+        humanoid.put("torso", new RigGroup(List.of("body"), List.of(0.2F, 0.35F, 0.2F, 0.8F, 0.72F, 0.8F)));
+        humanoid.put("arm.left", new RigGroup(List.of("left_arm"), List.of(0.8F, 0.35F, 0.3F, 1.0F, 0.7F, 0.7F)));
+        humanoid.put("arm.right", new RigGroup(List.of("right_arm"), List.of(0.0F, 0.35F, 0.3F, 0.2F, 0.7F, 0.7F)));
+        humanoid.put("leg.left", new RigGroup(List.of("left_leg"), List.of(0.55F, 0.0F, 0.3F, 0.8F, 0.35F, 0.7F)));
+        humanoid.put("leg.right", new RigGroup(List.of("right_leg"), List.of(0.2F, 0.0F, 0.3F, 0.45F, 0.35F, 0.7F)));
+        humanoid.put("all", new RigGroup(List.of(""), FULL_BOX));
         this.rigs.put(DEFAULT_ID, humanoid);
     }
 
     /** Reads every rig in every pack, replacing what was there. Returns how many loaded. */
     public int load(ResourceManager resources) {
-        Map<String, Map<String, List<String>>> loaded = new LinkedHashMap<>();
+        Map<String, Map<String, RigGroup>> loaded = new LinkedHashMap<>();
         loaded.put(DEFAULT_ID, this.rigs.get(DEFAULT_ID));
         int ignored = 0;
 
@@ -76,7 +79,7 @@ public final class RigRegistry {
                 continue;
             }
             try (BufferedReader reader = files.get(file).openAsReader()) {
-                Map<String, List<String>> rig = parse(source, reader);
+                Map<String, RigGroup> rig = parse(source, reader);
                 if (rig == null) {
                     ignored++;
                     continue;
@@ -101,7 +104,7 @@ public final class RigRegistry {
 
     /** Group names one rig knows, sorted. Empty when the rig is unknown. */
     public synchronized List<String> groups(String rigId) {
-        Map<String, List<String>> rig = this.rigs.get(rigId);
+        Map<String, RigGroup> rig = this.rigs.get(rigId);
         if (rig == null) {
             return List.of();
         }
@@ -118,21 +121,34 @@ public final class RigRegistry {
      * nothing.
      */
     public synchronized List<String> resolve(String rigId, String name) {
-        Map<String, List<String>> rig = this.rigs.get(rigId);
+        Map<String, RigGroup> rig = this.rigs.get(rigId);
         if (rig == null) {
             return List.of();
         }
-        List<String> paths = rig.get(name);
-        if (paths != null) {
-            return paths;
+        RigGroup group = rig.get(name);
+        if (group != null) {
+            return group.paths();
         }
         return validPath(name) ? List.of(name) : List.of();
     }
 
     /** Whether this rig names this group (as opposed to a raw path passing through). */
     public synchronized boolean hasGroup(String rigId, String name) {
-        Map<String, List<String>> rig = this.rigs.get(rigId);
+        Map<String, RigGroup> rig = this.rigs.get(rigId);
         return rig != null && rig.containsKey(name);
+    }
+
+    /**
+     * One group's fractional box, or null when the rig or group is unknown. Callers fall back
+     * to {@link #FULL_BOX}.
+     */
+    public synchronized List<Float> boxOf(String rigId, String group) {
+        Map<String, RigGroup> rig = this.rigs.get(rigId);
+        if (rig == null) {
+            return null;
+        }
+        RigGroup entry = rig.get(group);
+        return entry == null ? null : entry.box();
     }
 
     /** Dot-separated non-blank segments; the empty string addresses the root, null nothing. */
@@ -151,7 +167,7 @@ public final class RigRegistry {
         return true;
     }
 
-    private Map<String, List<String>> parse(String source, BufferedReader reader) throws RigFormatException {
+    private Map<String, RigGroup> parse(String source, BufferedReader reader) throws RigFormatException {
         JsonElement root;
         try {
             root = JsonParser.parseReader(reader);
@@ -173,8 +189,8 @@ public final class RigRegistry {
      * above is just transport. Returns null when the parent is unknown, which the caller reports
      * and skips.
      */
-    static Map<String, List<String>> build(
-            JsonObject json, String source, java.util.function.Function<String, Map<String, List<String>>> parents)
+    static Map<String, RigGroup> build(
+            JsonObject json, String source, java.util.function.Function<String, Map<String, RigGroup>> parents)
             throws RigFormatException {
 
         String parent = null;
@@ -189,26 +205,14 @@ public final class RigRegistry {
             throw new RigFormatException(source + ": \"groups\" is required, as an object of name to path lists");
         }
 
-        Map<String, List<String>> groups = new LinkedHashMap<>();
+        Map<String, RigGroup> groups = new LinkedHashMap<>();
         for (Map.Entry<String, JsonElement> entry : json.getAsJsonObject("groups").entrySet()) {
-            if (!entry.getValue().isJsonArray()) {
-                throw new RigFormatException(source + ": group \"" + entry.getKey() + "\" must be a list of paths");
-            }
-            List<String> paths = new ArrayList<>();
-            for (JsonElement path : entry.getValue().getAsJsonArray()) {
-                if (!path.isJsonPrimitive() || !path.getAsJsonPrimitive().isString()
-                        || !validPath(path.getAsString())) {
-                    throw new RigFormatException(source + ": group \"" + entry.getKey()
-                            + "\" holds \"" + path + "\", which is not a path");
-                }
-                paths.add(path.getAsString());
-            }
-            groups.put(entry.getKey(), List.copyOf(paths));
+            groups.put(entry.getKey(), group(source, entry.getKey(), entry.getValue()));
         }
 
-        Map<String, List<String>> merged = new LinkedHashMap<>();
+        Map<String, RigGroup> merged = new LinkedHashMap<>();
         if (parent != null) {
-            Map<String, List<String>> base = parents.apply(parent);
+            Map<String, RigGroup> base = parents.apply(parent);
             if (base == null) {
                 LOG.warn("{}: unknown parent rig \"{}\"; the file is ignored", source, parent);
                 return null;
@@ -217,6 +221,58 @@ public final class RigRegistry {
         }
         merged.putAll(groups);
         return Map.copyOf(merged);
+    }
+
+    /**
+     * One group entry: a bare path list, or an object with paths plus a fractional hit box.
+     * A missing box means the whole entity box.
+     */
+    private static RigGroup group(String source, String name, JsonElement element) throws RigFormatException {
+        JsonElement pathsElement = element;
+        JsonElement boxElement = null;
+        if (element.isJsonObject()) {
+            JsonObject object = element.getAsJsonObject();
+            pathsElement = object.get("paths");
+            boxElement = object.get("box");
+            if (pathsElement == null) {
+                throw new RigFormatException(source + ": group \"" + name + "\" needs a \"paths\" list");
+            }
+        }
+        if (pathsElement == null || !pathsElement.isJsonArray()) {
+            throw new RigFormatException(source + ": group \"" + name + "\" must be a list of paths");
+        }
+        List<String> paths = new ArrayList<>();
+        for (JsonElement path : pathsElement.getAsJsonArray()) {
+            if (!path.isJsonPrimitive() || !path.getAsJsonPrimitive().isString()
+                    || !validPath(path.getAsString())) {
+                throw new RigFormatException(source + ": group \"" + name
+                        + "\" holds \"" + path + "\", which is not a path");
+            }
+            paths.add(path.getAsString());
+        }
+        return new RigGroup(List.copyOf(paths), box(source, name, boxElement));
+    }
+
+    private static List<Float> box(String source, String name, JsonElement element) throws RigFormatException {
+        if (element == null || element.isJsonNull()) {
+            return FULL_BOX;
+        }
+        if (!element.isJsonArray() || element.getAsJsonArray().size() != 6) {
+            throw new RigFormatException(source + ": group \"" + name
+                    + "\" needs a box of six fractions [x0, y0, z0, x1, y1, z1]");
+        }
+        List<Float> box = new ArrayList<>(6);
+        for (JsonElement number : element.getAsJsonArray()) {
+            if (!number.isJsonPrimitive() || !number.getAsJsonPrimitive().isNumber()
+                    || !Float.isFinite(number.getAsFloat())) {
+                throw new RigFormatException(source + ": group \"" + name + "\" box holds a non-number");
+            }
+            box.add(number.getAsFloat());
+        }
+        if (!(box.get(0) <= box.get(3)) || !(box.get(1) <= box.get(4)) || !(box.get(2) <= box.get(5))) {
+            throw new RigFormatException(source + ": group \"" + name + "\" box minimums exceed maximums");
+        }
+        return List.copyOf(box);
     }
 
     static final class RigFormatException extends Exception {

@@ -66,4 +66,27 @@ class ServerMixinContractTest {
         assertEquals(void.class, net.minecraft.world.entity.player.Player.class
                 .getDeclaredMethod("causeFoodExhaustion", float.class).getReturnType());
     }
+
+    @Test
+    void everyProjectileDispatchesThroughOnHit() throws Exception {
+        assertEquals(void.class, net.minecraft.world.entity.projectile.Projectile.class
+                .getDeclaredMethod("onHit", net.minecraft.world.phys.HitResult.class).getReturnType());
+    }
+
+    @Test
+    void damageLandsInHurtServerWithDamageThird() throws Exception {
+        var method = LivingEntity.class.getDeclaredMethod(
+                "hurtServer", net.minecraft.server.level.ServerLevel.class,
+                DamageSource.class, float.class);
+        assertEquals(boolean.class, method.getReturnType());
+        var params = method.getParameterTypes();
+        assertEquals(3, params.length);
+        assertEquals(float.class, params[2]);
+    }
+
+    @Test
+    void meleeStartsAtAttack() throws Exception {
+        assertEquals(void.class, net.minecraft.world.entity.player.Player.class
+                .getDeclaredMethod("attack", Entity.class).getReturnType());
+    }
 }

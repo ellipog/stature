@@ -144,6 +144,18 @@ elytra and held layers follow the same nodes. The box never follows parts except
 `hitbox_from_parts`, which derives one presence box from the largest factors. First-person hands
 are vanilla's separate rig and do not follow yet.
 
+## Hurt regions
+
+```json
+"regions": [{ "part": "head", "multiplier": 3.0, "tag": "headshot" }]
+```
+
+A hit landing inside a region deals scaled damage and is tagged for downstream consumers
+(Kith reads the last hit). Regions name rig groups, whose fractional boxes breathe with their
+part factors; projectiles resolve from the impact point, melee from a validated view raycast
+that degrades to a normal hit past walls or out of reach. Measured: equal-speed arrows dealt
+7.0 frameless and 21.0 to a triple head region, with torso hits unscaled.
+
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied
 where `submit` writes the matrix. The two client mixins are green on the compiler and traced against the

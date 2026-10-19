@@ -56,7 +56,7 @@ public final class FrameCodec {
     /** Fields this build understands. Anything else is reported once per file. */
     private static final Set<String> KNOWN = Set.of(
             "size", "scale", "eye_height", "easing", "entities", "entity_tags",
-            "rig", "parts", "hitbox_from_parts", "comment", "$schema");
+            "rig", "parts", "hitbox_from_parts", "regions", "comment", "$schema");
 
     /** Conventionally a schema pointer or prose, and never a frame's business. */
     private static final Set<String> IGNORED_SILENTLY = Set.of("comment", "$schema");
@@ -95,6 +95,7 @@ public final class FrameCodec {
         String rig = optionalId(source, json, "rig", "stature:humanoid");
         Map<String, List<Float>> parts = parts(source, json);
         boolean hitboxFromParts = optionalFlag(source, json, "hitbox_from_parts");
+        List<FrameRegion> regions = regions(source, json);
 
         StringBuilder unknown = new StringBuilder();
         for (String key : json.keySet()) {
@@ -110,7 +111,7 @@ public final class FrameCodec {
 
         try {
             return new FrameFile(id, new FrameSpec(scale, size[0], size[1], size[2], eyeHeight, easing),
-                    entities, tags, rig, parts, hitboxFromParts);
+                    entities, tags, rig, parts, hitboxFromParts, regions);
         } catch (IllegalArgumentException e) {
             throw new FrameFormatException(source + ": " + e.getMessage(), e);
         }
@@ -289,6 +290,49 @@ public final class FrameCodec {
             parts.put(entry.getKey(), List.copyOf(factors));
         }
         return Map.copyOf(parts);
+    }
+
+    /**
+     * Hurt regions, or empty when the field is absent. Each entry names a rig group, a damage
+     * multiplier and a tag; malformed entries fail the file, because a silently wrong weak point
+     * is worse than a loud one.
+     */
+    private static List<FrameRegion> regions(String source, JsonObject json) throws FrameFormatException {
+        JsonElement element = json.get("regions");
+        if (element == null || element.isJsonNull()) {
+            return List.of();
+        }
+        if (!element.isJsonArray()) {
+            throw new FrameFormatException(source + ": \"regions\" must be a list of {part, multiplier, tag}, got "
+                    + kindOf(element));
+        }
+
+        List<FrameRegion> regions = new ArrayList<>();
+        for (JsonElement entry : element.getAsJsonArray()) {
+            if (!entry.isJsonObject()) {
+                throw new FrameFormatException(source + ": a region must be {part, multiplier, tag}, got "
+                        + kindOf(entry));
+            }
+            JsonObject region = entry.getAsJsonObject();
+            String part = region.has("part") && region.get("part").isJsonPrimitive()
+                    && region.getAsJsonPrimitive("part").isString()
+                    ? region.getAsJsonPrimitive("part").getAsString().trim()
+                    : null;
+            String tag = region.has("tag") && region.get("tag").isJsonPrimitive()
+                    && region.getAsJsonPrimitive("tag").isString()
+                    ? region.getAsJsonPrimitive("tag").getAsString().trim()
+                    : null;
+            float multiplier = region.has("multiplier") && region.get("multiplier").isJsonPrimitive()
+                    && region.getAsJsonPrimitive("multiplier").isNumber()
+                    ? region.getAsJsonPrimitive("multiplier").getAsFloat()
+                    : Float.NaN;
+            try {
+                regions.add(new FrameRegion(part, multiplier, tag));
+            } catch (IllegalArgumentException e) {
+                throw new FrameFormatException(source + ": " + e.getMessage(), e);
+            }
+        }
+        return List.copyOf(regions);
     }
 
     private static String shortName(Easing easing) {        return switch (easing) {

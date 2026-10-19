@@ -6,6 +6,7 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
 import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
+import dev.ellipog.stature.common.parts.HitRegion;
 import dev.ellipog.stature.common.frame.FrameSource;
 
 import java.util.Map;
@@ -109,6 +110,19 @@ public interface StatureScale {
 
     /** In-flight part changes, same deal. */
     Map<String, AxesTransition> stature$partTransitions();
+
+    /**
+     * A hit region waiting for damage application, or null. Producers stash it with the current
+     * tick; the damage hook consumes it in the same tick and records it as the last hit.
+     */
+    HitRegion stature$incomingRegion();
+
+    void stature$setIncomingRegion(HitRegion region);
+
+    /** The last region hit on this entity, for downstream consumers. Never saved. */
+    HitRegion stature$lastHit();
+
+    void stature$setLastHit(HitRegion hit);
 
     /** The frame's eye height in blocks at scale 1, or {@link #NO_EYE_HEIGHT}. */
     float stature$eyeHeight();

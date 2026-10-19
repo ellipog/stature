@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 class RigRegistryTest {
 
-    private static Map<String, List<String>> build(String json) throws Exception {
+    private static Map<String, RigGroup> build(String json) throws Exception {
         return RigRegistry.build(
                 JsonParser.parseString(json).getAsJsonObject(), "test", name -> null);
     }
@@ -38,17 +38,37 @@ class RigRegistryTest {
     }
 
     @Test
+    void theDefaultHeadCoversTheTopOfTheBox() {
+        RigRegistry registry = new RigRegistry();
+        List<Float> box = registry.boxOf("stature:humanoid", "head");
+        assertEquals(6, box.size());
+        assertTrue(box.get(4) <= 1.0F && box.get(1) >= 0.5F);
+        assertNull(registry.boxOf("stature:humanoid", "wing.left"));
+        assertNull(registry.boxOf("pack:missing", "head"));
+    }
+
+    @Test
     void groupsMergeOverTheParent() throws Exception {
-        Map<String, List<String>> child = RigRegistry.build(
+        Map<String, RigGroup> child = RigRegistry.build(
                 JsonParser.parseString("{\"parent\": \"stature:humanoid\","
                         + " \"groups\": {\"head\": [\"skull\"], \"wing.left\": [\"left_wing\"]}}").getAsJsonObject(),
                 "test",
                 name -> "stature:humanoid".equals(name)
-                        ? Map.of("head", List.of("head"), "torso", List.of("body"))
+                        ? Map.of("head", new RigGroup(List.of("head"), RigRegistry.FULL_BOX),
+                                "torso", new RigGroup(List.of("body"), RigRegistry.FULL_BOX))
                         : null);
-        assertEquals(List.of("skull"), child.get("head"));
-        assertEquals(List.of("body"), child.get("torso"));
-        assertEquals(List.of("left_wing"), child.get("wing.left"));
+        assertEquals(List.of("skull"), child.get("head").paths());
+        assertEquals(List.of("body"), child.get("torso").paths());
+        assertEquals(List.of("left_wing"), child.get("wing.left").paths());
+        assertEquals(RigRegistry.FULL_BOX, child.get("wing.left").box());
+    }
+
+    @Test
+    void aGroupCanCarryItsOwnBox() throws Exception {
+        Map<String, RigGroup> rig = build(
+                "{\"groups\": {\"head\": {\"paths\": [\"skull\"], \"box\": [0, 0.7, 0, 1, 1, 1]}}}");
+        assertEquals(List.of("skull"), rig.get("head").paths());
+        assertEquals(List.of(0.0F, 0.7F, 0.0F, 1.0F, 1.0F, 1.0F), rig.get("head").box());
     }
 
     @Test
@@ -65,6 +85,10 @@ class RigRegistryTest {
         assertThrows(Exception.class, () -> build("{\"groups\": {\"head\": [\"a..b\"]}}"));
         assertThrows(Exception.class, () -> build("{\"groups\": [\"head\"]}"));
         assertThrows(Exception.class, () -> build("[\"head\"]"));
+        assertThrows(Exception.class, () -> build("{\"groups\": {\"head\": {\"paths\": [\"skull\"], \"box\": [0, 1]}}}"));
+        assertThrows(Exception.class, () -> build("{\"groups\": {\"head\": {\"box\": [0, 0, 0, 1, 1, 1]}}}"));
+        assertThrows(Exception.class,
+                () -> build("{\"groups\": {\"head\": {\"paths\": [\"skull\"], \"box\": [0, 0.9, 0, 1, 0.5, 1]}}}"));
     }
 
     @Test
