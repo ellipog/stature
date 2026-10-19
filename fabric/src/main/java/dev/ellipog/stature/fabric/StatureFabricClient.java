@@ -1,0 +1,34 @@
+package dev.ellipog.stature.fabric;
+
+import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.net.AxesPayload;
+
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+
+/**
+ * The client receiver, in a client entry point so a dedicated server never loads it.
+ *
+ * <p>The entity is looked up by id in the client level rather than trusted from the packet: an id
+ * for an entity this client has not received yet is a packet that arrived before its spawn, and the
+ * right answer there is to ignore it once the next broadcast carries the same size.
+ */
+public final class StatureFabricClient implements ClientModInitializer {
+
+    @Override
+    public void onInitializeClient() {
+        ClientPlayNetworking.registerGlobalReceiver(AxesPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().level == null) {
+                        return;
+                    }
+                    Entity entity = context.client().level.getEntity(payload.entityId());
+                    if (entity instanceof LivingEntity living) {
+                        ScaleService.applyFromServer(living, payload.state(), payload.eyeHeight());
+                    }
+                }));
+    }
+}

@@ -10,8 +10,9 @@ displayURL="https://ellipog.dev" #optional (displayed in the mod UI)
 credits="${credits}" #optional
 authors = "${mod_author}" #optional
 description = '''${description}''' #mandatory (Supports multiline text)
-# No [[mixins]] blocks yet: the spike proved the approach in spike-s2/, and they migrate here
-# with the frame work (plan §14.8). Add one here when a mixin genuinely earns its place.
+# The backbone's one mixin: a living entity keeps its own scale transition and advances it on its
+# own tick. No refmap, deliberately -- 26.x is unobfuscated, so there are no obfuscated names for one
+# to map back, and spike-s2/ proved mixins apply without it.
 [[dependencies.${mod_id}]] #optional
 modId = "neoforge" #mandatory
 type="required" #mandatory (Can be one of "required", "optional", "incompatible" or "discouraged")
@@ -24,6 +25,9 @@ type="required" #mandatory
 versionRange = "${minecraft_version_range}"
 ordering = "NONE"
 side = "BOTH"
+
+[[mixins]]
+config = "stature.mixins.json"
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't

@@ -1,0 +1,53 @@
+package dev.ellipog.stature.common.mixin;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
+
+import org.junit.jupiter.api.Test;
+
+/**
+ * The server-side twin of the render contract test: every method a server mixin injects into,
+ * pinned by descriptor.
+ *
+ * <p>The mixin config is already {@code required} with {@code defaultRequire}, so a Mojang rename
+ * would die loudly at launch; this dies one step earlier, at build time, and names the exact
+ * signature that moved. {@code restoreFrom} is the load-bearing one here: it is the only thing
+ * that carries an explicit size across death, and a silent miss would mean dying quietly
+ * un-sizes you.
+ */
+class ServerMixinContractTest {
+
+    @Test
+    void saveAndLoadAreTheConcreteEntityMethods() throws Exception {
+        assertEquals(void.class,
+                Entity.class.getDeclaredMethod("saveWithoutId", ValueOutput.class).getReturnType());
+        assertEquals(void.class,
+                Entity.class.getDeclaredMethod("load", ValueInput.class).getReturnType());
+    }
+
+    @Test
+    void depthLivesOnThePositionedBoxBuilder() throws Exception {
+        assertEquals(net.minecraft.world.phys.AABB.class,
+                Entity.class.getDeclaredMethod("makeBoundingBox", Vec3.class).getReturnType());
+    }
+
+    @Test
+    void dimensionsAndTickAreWhereTheShapeHooksSit() throws Exception {
+        assertEquals(net.minecraft.world.entity.EntityDimensions.class,
+                LivingEntity.class.getDeclaredMethod("getDimensions", Pose.class).getReturnType());
+        assertEquals(void.class, LivingEntity.class.getDeclaredMethod("tick").getReturnType());
+    }
+
+    @Test
+    void respawnCarriesThroughRestoreFrom() throws Exception {
+        assertEquals(void.class, ServerPlayer.class
+                .getDeclaredMethod("restoreFrom", ServerPlayer.class, boolean.class).getReturnType());
+    }
+}

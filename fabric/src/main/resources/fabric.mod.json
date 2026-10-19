@@ -9,8 +9,14 @@
     "entrypoints": {
         "main": [
             "dev.ellipog.stature.fabric.StatureFabric"
+        ],
+        "client": [
+            "dev.ellipog.stature.fabric.StatureFabricClient"
         ]
     },
+    "mixins": [
+        "stature.mixins.json"
+    ],
     "depends": {
         "fabricloader": ">=${fabric_loader_version}",
         "fabric-api": ">=${fabric_version}",

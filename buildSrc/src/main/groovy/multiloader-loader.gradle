@@ -26,6 +26,21 @@ tasks.named('compileJava', JavaCompile) {
     source(configurations.commonJava)
 }
 
+// ---------------------------------------------------------------------------
+// :api rides inside the loader jars.
+//
+// :api is pure Java with no dependencies of its own, so its classes travel in the loader
+// jar and a profile needs one jar per loader, not two. `implementation project(':api')`
+// alone only puts it on the compile classpath: the dev runs worked, and the first real
+// profile crashed with NoClassDefFoundError the moment commands registered, because the
+// loader jar did not contain the classes. Third parties still compile against the
+// published :api artifact; these are the same classes from the same sources.
+// ---------------------------------------------------------------------------
+tasks.named('jar', Jar) {
+    dependsOn project(':api').tasks.named('compileJava')
+    from project(':api').sourceSets.main.output
+}
+
 processResources {
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
@@ -41,6 +56,8 @@ tasks.named('sourcesJar', Jar) {
     from(configurations.commonJava)
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
+    dependsOn project(':api').tasks.named('compileJava')
+    from project(':api').sourceSets.main.allSource
 }
 
 // ---------------------------------------------------------------------------

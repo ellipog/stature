@@ -36,8 +36,7 @@ neoForge {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 dependencies {
-    // :api travels with the loader because these sources name it (see multiloader-loader.gradle:
-    // common's sources are recompiled here, and its `implementation project(':api')` does not
-    // cross the project boundary on its own).
+    // :api is on the compile classpath here, and its classes ride inside this jar (see
+    // multiloader-loader.gradle): a profile needs this one jar, not a second api jar.
     implementation project(':api')
 }

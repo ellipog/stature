@@ -1,0 +1,86 @@
+package dev.ellipog.stature.common;
+
+import dev.ellipog.stature.api.Easing;
+import dev.ellipog.stature.api.ScaleAxes;
+import dev.ellipog.stature.api.ScaleState;
+import dev.ellipog.stature.api.ScaleTransition;
+import dev.ellipog.stature.common.frame.FrameSource;
+
+import net.minecraft.resources.Identifier;
+
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * What a scaled entity can be asked, and what a third-party mod may hold on to.
+ *
+ * <p>The {@code stature$} prefix is not decoration: these members are added to a Minecraft class by
+ * a mixin, and Mixin refuses a member without the configured prefix. The shape is plan §14.2's
+ * {@code StatureEntity} sketch, arriving early because the backbone needs somewhere to keep its
+ * transition, its shape and its frame.
+ *
+ * <p>Everything here is deliberately per-entity rather than global state: a transition belongs to the
+ * entity that is scaling, travels with it, and is advanced by that entity's own tick.
+ */
+public interface StatureScale {
+
+    /** No eye-height override: the camera sits where the shaped dimensions put it. */
+    float NO_EYE_HEIGHT = -1.0F;
+
+    /**
+     * This entity's live transition, created on first use at whatever size the entity is at.
+     *
+     * <p>Never null once asked for. A freshly created one is finished and sits at the current size,
+     * so "no transition" and "a transition that is over" are the same state rather than two.
+     */
+    ScaleTransition stature$transition();
+
+    /**
+     * Starts a change towards {@code target} over {@code ticks}, easing with {@code easing}.
+     *
+     * <p>Replaces any transition already running, from wherever the entity is right now rather than
+     * from the old transition's start -- so interrupting a change does not jump.
+     */
+    void stature$setTarget(ScaleState target, int ticks, Easing easing);
+
+    /** The size the entity is at now: the game's attribute for the scale, this duck for the shape. */
+    ScaleState stature$currentState();
+
+    /** The box's shape. {@link ScaleAxes#UNIFORM} when nothing has shaped it. */
+    ScaleAxes stature$axes();
+
+    /**
+     * Sets the box's shape with no easing and no packet.
+     *
+     * <p>Called by the service (server side, which then syncs) and by the client receiver (which is
+     * the sync). It does not reshape the box -- the caller does that, because a caller that sets
+     * three shapes in a row should pay for one rebuild.
+     */
+    void stature$setAxes(ScaleAxes axes);
+
+    /** The frame this entity was sized by, or null when it was shaped by hand. */
+    @Nullable
+    Identifier stature$frame();
+
+    void stature$setFrame(@Nullable Identifier frame);
+
+    /** Why the current frame or hand size won. Automatic rules must leave anything but NONE alone. */
+    FrameSource stature$frameSource();
+
+    void stature$setFrameSource(FrameSource source);
+
+    /**
+     * Set when a load restores a custom size that clients may not know yet.
+     *
+     * <p>Transient on purpose: it answers "was this just loaded", not "what won", and recomputing
+     * it after every load is cheaper than trusting a saved copy. Only players ever read it, because
+     * a tracked mob re-syncs through StartTracking while your own player entity never does.
+     */
+    boolean stature$needsSync();
+
+    void stature$setNeedsSync(boolean needsSync);
+
+    /** The frame's eye height in blocks at scale 1, or {@link #NO_EYE_HEIGHT}. */
+    float stature$eyeHeight();
+
+    void stature$setEyeHeight(float eyeHeight);
+}

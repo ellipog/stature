@@ -10,9 +10,8 @@ dependencies {
     // for 26.x either, so there is nothing to layer.
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
-    // :api travels with the loader because these sources name it (see multiloader-loader.gradle:
-    // common's sources are recompiled here, and its `implementation project(':api')` does not
-    // cross the project boundary on its own).
+    // :api is on the compile classpath here, and its classes ride inside this jar (see
+    // multiloader-loader.gradle): a profile needs this one jar, not a second api jar.
     implementation project(':api')
 }
 
