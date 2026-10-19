@@ -25,3 +25,8 @@ build
 eclipse
 run
 runs
+
+# local run artifacts, never committed
+.server.log
+.deploy.log
+.build.log
