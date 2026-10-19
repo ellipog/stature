@@ -8,9 +8,10 @@ import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
 import dev.ellipog.stature.common.parts.HitRegion;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.Thresholds;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.parts.PartService;
-import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
 import dev.ellipog.stature.common.net.StatureNetworking;
@@ -227,6 +228,7 @@ public abstract class LivingEntityMixin implements StatureScale {
             FrameService.ensureAssigned(self);
             ChannelService.tick(self);
             PartService.tick(self);
+            Thresholds.tick(self);
             stature$syncSelf(self);
         }
         if (this.stature$transition == null || this.stature$transition.isDone()) {
@@ -263,6 +265,17 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     /**
+     * Lets micro entities climb any wall they are pressed against. Runs on both sides so
+     * prediction agrees; the client gates on the synced config with frame fallback.
+     */
+    @Inject(method = "onClimbable()Z", at = @At("RETURN"), cancellable = true)
+    private void stature$climbWalls(CallbackInfoReturnable<Boolean> cir) {
+        if (!cir.getReturnValue() && Thresholds.canClimbWalls((LivingEntity) (Object) this)) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    /**
      * Re-sends a customized player to themselves.
      *
      * <p>Broadcasts and StartTracking cover every viewer <em>except</em> the player themself: your
@@ -291,8 +304,7 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Inject(method = "getDimensions", at = @At("RETURN"), cancellable = true)
-    private void stature$shapeDimensions(Pose pose, CallbackInfoReturnable<EntityDimensions> cir) {
-        LivingEntity self = (LivingEntity) (Object) this;
+    private void stature$shapeDimensions(Pose pose, CallbackInfoReturnable<EntityDimensions> cir) {        LivingEntity self = (LivingEntity) (Object) this;
         EntityDimensions original = cir.getReturnValue();
         EntityDimensions shaped = original;
 

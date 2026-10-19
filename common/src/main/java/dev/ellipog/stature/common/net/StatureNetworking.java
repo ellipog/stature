@@ -42,6 +42,9 @@ public final class StatureNetworking {
 
         /** One player, for part factors they have not been sent yet. */
         void sendTo(ServerPlayer player, PartsPayload payload);
+
+        /** One player, for the threshold tiers and flags. */
+        void sendTo(ServerPlayer player, ConfigPayload payload);
     }
 
     private static Network installed;
@@ -86,6 +89,12 @@ public final class StatureNetworking {
     public static void sendPartsTo(ServerPlayer player, LivingEntity entity, Map<String, ScaleAxes> parts) {
         if (installed != null) {
             installed.sendTo(player, new PartsPayload(entity.getId(), parts));
+        }
+    }
+
+    public static void sendConfigTo(ServerPlayer player, float micro, float macro, Map<String, Boolean> flags) {
+        if (installed != null) {
+            installed.sendTo(player, new ConfigPayload(micro, macro, flags));
         }
     }
 

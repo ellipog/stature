@@ -9,6 +9,7 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.core.Holder;
@@ -160,8 +161,15 @@ public final class ChannelService {
     /**
      * The multiplier for knockback this entity takes: the override, else the base scale to the
      * negative root. A giant shrugs, a coblyn flies; an override multiplies either way.
+     * The follow is continuous across every scale rather than tier-gated, so there is no
+     * cliff at the micro edge; the config flag disables the follow when an operator wants
+     * plain vanilla knockback.
      */
     public static float knockbackReceivedFactor(LivingEntity entity) {
+        if (!StatureConfig.enabled(entity, StatureConfig.AMPLIFIED_KNOCKBACK)) {
+            Float override = ((StatureScale) entity).stature$channelOverrides().get("stature:knockback_received");
+            return override != null && override >= 0.0F ? override : 1.0F;
+        }
         return channelFactor(entity, "stature:knockback_received");
     }
 

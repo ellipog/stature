@@ -24,6 +24,7 @@ import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleLimits;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelRegistry;
 import dev.ellipog.stature.common.channel.ChannelService;
@@ -32,6 +33,7 @@ import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
+import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -40,6 +42,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -539,6 +542,11 @@ public final class StatureCommands {
     private static int reload(CommandContext<CommandSourceStack> context) {
         int count = StatureFrames.load(context.getSource().getServer().getResourceManager());
         RigRegistry.instance().load(context.getSource().getServer().getResourceManager());
+        StatureConfig.reload();
+        for (ServerPlayer player : context.getSource().getServer().getPlayerList().getPlayers()) {
+            StatureNetworking.sendConfigTo(player,
+                    StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot());
+        }
         int updated = FrameService.refreshAutomatic(context.getSource().getServer());
         context.getSource().sendSuccess(
                 () -> Component.translatable("stature.command.reload", count, updated), false);

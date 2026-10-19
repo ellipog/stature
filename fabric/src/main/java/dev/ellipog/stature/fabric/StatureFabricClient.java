@@ -1,9 +1,11 @@
 package dev.ellipog.stature.fabric;
 
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.net.ConfigPayload;
 import dev.ellipog.stature.common.net.PartsPayload;
 
 import net.fabricmc.api.ClientModInitializer;
@@ -59,5 +61,8 @@ public final class StatureFabricClient implements ClientModInitializer {
                         duck.stature$partFactors().putAll(payload.parts());
                     }
                 }));
+        ClientPlayNetworking.registerGlobalReceiver(ConfigPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> StatureConfig.applySynced(
+                        payload.micro(), payload.macro(), payload.flags())));
     }
 }

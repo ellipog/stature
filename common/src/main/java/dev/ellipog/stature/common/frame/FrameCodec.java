@@ -15,6 +15,7 @@ import com.google.gson.JsonParser;
 
 import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.FrameSpec;
+import dev.ellipog.stature.common.StatureConfig;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -56,7 +57,7 @@ public final class FrameCodec {
     /** Fields this build understands. Anything else is reported once per file. */
     private static final Set<String> KNOWN = Set.of(
             "size", "scale", "eye_height", "easing", "entities", "entity_tags",
-            "rig", "parts", "hitbox_from_parts", "regions", "comment", "$schema");
+            "rig", "parts", "hitbox_from_parts", "regions", "thresholds", "comment", "$schema");
 
     /** Conventionally a schema pointer or prose, and never a frame's business. */
     private static final Set<String> IGNORED_SILENTLY = Set.of("comment", "$schema");
@@ -96,6 +97,7 @@ public final class FrameCodec {
         Map<String, List<Float>> parts = parts(source, json);
         boolean hitboxFromParts = optionalFlag(source, json, "hitbox_from_parts");
         List<FrameRegion> regions = regions(source, json);
+        Thresholds thresholds = thresholds(source, json);
 
         StringBuilder unknown = new StringBuilder();
         for (String key : json.keySet()) {
@@ -111,7 +113,8 @@ public final class FrameCodec {
 
         try {
             return new FrameFile(id, new FrameSpec(scale, size[0], size[1], size[2], eyeHeight, easing),
-                    entities, tags, rig, parts, hitboxFromParts, regions);
+                    entities, tags, rig, parts, hitboxFromParts, regions,
+                    thresholds.micro(), thresholds.macro(), thresholds.flags());
         } catch (IllegalArgumentException e) {
             throw new FrameFormatException(source + ": " + e.getMessage(), e);
         }
@@ -333,6 +336,65 @@ public final class FrameCodec {
             }
         }
         return List.copyOf(regions);
+    }
+
+    /**
+     * Per-frame threshold overrides: optional tier edges plus named mechanic flags. Absent
+     * entirely more often than not; unknown flag keys are reported and skipped.
+     */
+    private static Thresholds thresholds(String source, JsonObject json) throws FrameFormatException {
+        JsonElement element = json.get("thresholds");
+        if (element == null || element.isJsonNull()) {
+            return new Thresholds(null, null, Map.of());
+        }
+        if (!element.isJsonObject()) {
+            throw new FrameFormatException(source + ": \"thresholds\" must be an object, got "
+                    + kindOf(element));
+        }
+        JsonObject thresholds = element.getAsJsonObject();
+
+        Float micro = null;
+        Float macro = null;
+        if (thresholds.has("micro")) {
+            micro = thresholdEdge(source, thresholds, "micro");
+        }
+        if (thresholds.has("macro")) {
+            macro = thresholdEdge(source, thresholds, "macro");
+        }
+        if (micro != null && macro != null && !(micro < macro)) {
+            throw new FrameFormatException(source + ": \"thresholds\" needs micro below macro");
+        }
+
+        Map<String, Boolean> flags = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : thresholds.entrySet()) {
+            String key = entry.getKey();
+            if (key.equals("micro") || key.equals("macro")) {
+                continue;
+            }
+            if (!StatureConfig.flagKeys().contains(key)) {
+                StatureFrames.LOG.info("{}: ignoring unknown threshold flag \"{}\"", source, key);
+                continue;
+            }
+            if (entry.getValue().isJsonPrimitive() && entry.getValue().getAsJsonPrimitive().isBoolean()) {
+                flags.put(key, entry.getValue().getAsBoolean());
+            } else {
+                throw new FrameFormatException(source + ": threshold flag \"" + key + "\" must be true or false");
+            }
+        }
+        return new Thresholds(micro, macro, Map.copyOf(flags));
+    }
+
+    private static float thresholdEdge(String source, JsonObject json, String key) throws FrameFormatException {
+        JsonElement element = json.get(key);
+        if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()
+                || !Float.isFinite(element.getAsFloat()) || !(element.getAsFloat() > 0.0F)) {
+            throw new FrameFormatException(source + ": \"thresholds\" edge \"" + key
+                    + "\" must be a positive number");
+        }
+        return element.getAsFloat();
+    }
+
+    private record Thresholds(Float micro, Float macro, Map<String, Boolean> flags) {
     }
 
     private static String shortName(Easing easing) {        return switch (easing) {

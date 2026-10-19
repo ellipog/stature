@@ -2,6 +2,7 @@ package dev.ellipog.stature.neoforge;
 
 import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -10,6 +11,7 @@ import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.net.ConfigPayload;
 import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
@@ -71,7 +73,9 @@ public final class StatureNeoForge {
                                 duck.stature$partFactors().clear();
                                 duck.stature$partFactors().putAll(payload.parts());
                             }
-                        })));
+                        })).playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC,
+                        (payload, context) -> context.enqueueWork(() -> StatureConfig.applySynced(
+                                payload.micro(), payload.macro(), payload.flags()))));
 
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) ->
                 StatureCommands.register(event.getDispatcher()));
@@ -94,6 +98,14 @@ public final class StatureNeoForge {
         NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) -> {
             StatureFrames.load(event.getServer().getResourceManager());
             RigRegistry.instance().load(event.getServer().getResourceManager());
+            StatureConfig.load(net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get());
+        });
+
+        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
+            if (event.getEntity() instanceof ServerPlayer player) {
+                StatureNetworking.sendConfigTo(player,
+                        StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot());
+            }
         });
 
         LOG.info("Stature loaded");

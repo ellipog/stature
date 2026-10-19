@@ -27,13 +27,17 @@ public record FrameFile(
         String rig,
         Map<String, List<Float>> parts,
         boolean hitboxFromParts,
-        List<FrameRegion> regions) {
+        List<FrameRegion> regions,
+        Float thresholdMicro,
+        Float thresholdMacro,
+        Map<String, Boolean> thresholdFlags) {
 
     public FrameFile {
         entities = List.copyOf(entities);
         entityTags = List.copyOf(entityTags);
         parts = Map.copyOf(parts);
         regions = List.copyOf(regions);
+        thresholdFlags = Map.copyOf(thresholdFlags);
     }
 
     /** Whether this frame says anything about where it belongs. */

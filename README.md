@@ -156,6 +156,24 @@ part factors; projectiles resolve from the impact point, melee from a validated 
 that degrades to a normal hit past walls or out of reach. Measured: equal-speed arrows dealt
 7.0 frameless and 21.0 to a triple head region, with torso hits unscaled.
 
+## Thresholds
+
+```json
+{
+  "micro_threshold": 0.25,
+  "macro_threshold": 2.5,
+  "surface_climbing": true,
+  "trampling": true,
+  "doorway_collision": true
+}
+```
+
+`config/stature.json` holds the two tier edges and a flag per mechanic; frames override any
+of them per entity. Below micro, walls climb like ladders; above macro, leaves, panes and
+crops break on contact and low ceilings compress for 2.0 every second. Knockback already
+followed the root law at every scale, so its flag only disables the follow. Measured: a
+macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve seconds.
+
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied
 where `submit` writes the matrix. The two client mixins are green on the compiler and traced against the

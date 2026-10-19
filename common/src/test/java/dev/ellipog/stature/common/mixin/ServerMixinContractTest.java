@@ -89,4 +89,10 @@ class ServerMixinContractTest {
         assertEquals(void.class, net.minecraft.world.entity.player.Player.class
                 .getDeclaredMethod("attack", Entity.class).getReturnType());
     }
+
+    @Test
+    void climbingFlowsThroughOnClimbable() throws Exception {
+        assertEquals(boolean.class, LivingEntity.class
+                .getDeclaredMethod("onClimbable").getReturnType());
+    }
 }

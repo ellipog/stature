@@ -1,14 +1,15 @@
 package dev.ellipog.stature.fabric;
 
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
 import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
-import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.net.ConfigPayload;
 import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
@@ -17,6 +18,8 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 
 import net.minecraft.world.entity.LivingEntity;
 
@@ -49,6 +52,7 @@ public final class StatureFabric implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(AxesPayload.TYPE, AxesPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(PartsPayload.TYPE, PartsPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC);
         StatureNetworking.install(new FabricStatureNetwork());
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
@@ -71,7 +75,13 @@ public final class StatureFabric implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             StatureFrames.load(server.getResourceManager());
             RigRegistry.instance().load(server.getResourceManager());
+            StatureConfig.load(FabricLoader.getInstance().getConfigDir());
         });
+
+        // Movement gating must agree on both sides, so each login carries the tiers and flags.
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+                StatureNetworking.sendConfigTo(handler.getPlayer(),
+                        StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot()));
 
         LOG.info("Stature loaded");
     }
