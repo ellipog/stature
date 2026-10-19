@@ -3,6 +3,8 @@ package dev.ellipog.stature.common.mixin.client;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.client.StatureRenderState;
 
+import java.util.Map;
+
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -46,6 +48,9 @@ public abstract class LivingEntityRenderStateMixin implements StatureRenderState
     @Unique
     private ScaleAxes stature$shape;
 
+    @Unique
+    private Map<String, Float> stature$channels;
+
     @Override
     public void stature$pushFrame(int tick, float partialTick, float scale, ScaleAxes shape) {
         if (!this.stature$hasHistory || tick < this.stature$lastTick) {
@@ -79,6 +84,43 @@ public abstract class LivingEntityRenderStateMixin implements StatureRenderState
             return ScaleAxes.UNIFORM;
         }
         return ScaleAxes.lerp(this.stature$prevShape, this.stature$shape, stature$unit(this.stature$partialTick));
+    }
+
+    @Override
+    public void stature$pushChannels(Map<String, Float> channels) {
+        this.stature$channels = Map.copyOf(channels);
+    }
+
+    @Override
+    public boolean stature$hidden() {
+        Float visibility = this.stature$channels().get("stature:visibility");
+        return visibility != null && visibility < 0.5F;
+    }
+
+    @Override
+    public float stature$heldFactor() {
+        return stature$factor("stature:held_item");
+    }
+
+    @Override
+    public float stature$shadowFactor() {
+        return stature$factor("stature:shadow");
+    }
+
+    /** This frame's overrides, or nothing when no frame has pushed yet. */
+    @Unique
+    private Map<String, Float> stature$channels() {
+        return this.stature$channels == null ? Map.of() : this.stature$channels;
+    }
+
+    /**
+     * One render factor: the override, or exactly 1 when unset or corrupt. A NaN here would scale
+     * a matrix by nothing-meaningful, so corrupt values degrade to neutral like everywhere else.
+     */
+    @Unique
+    private float stature$factor(String id) {
+        Float value = this.stature$channels().get(id);
+        return value != null && value >= 0.0F ? value : 1.0F;
     }
 
     /**

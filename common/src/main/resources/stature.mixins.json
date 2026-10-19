@@ -5,11 +5,14 @@
     "compatibilityLevel": "JAVA_21",
     "mixins": [
         "EntityMixin",
+        "KnockbackMixin",
         "LivingEntityMixin",
         "PlayerMixin",
         "ServerPlayerMixin"
     ],
     "client": [
+        "client.EntityRenderDispatcherMixin",
+        "client.ItemInHandLayerMixin",
         "client.LivingEntityRendererMixin",
         "client.LivingEntityRenderStateMixin"
     ],

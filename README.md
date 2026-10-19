@@ -102,7 +102,7 @@ cannot be the width used twice.
 
 ## Channels
 
-Thirty-eight named things a scale can drive, each following the base unless overridden:
+Forty-four named things a scale can drive, each following the base unless overridden:
 
 ```cmd
 /stature channel <targets> list                       what each channel says
@@ -120,6 +120,12 @@ shows `motion` at 1.414 with everything linear at 2.000, and the zombie's speed 
 `motion 2.0` means a speed of 2.0 -- eased when set through the API, saved with the entity, and
 synced to viewers. Entries the operator set carry an `(override)` mark in the list. Mods declare their own channels through `ChannelRegistry`; anything outside
 `stature:` ships experimental, so the surface can grow without freezing a bad idea.
+
+Beyond attributes: knockback taken and dealt scale at the hit (giants shrug, coblyns fly),
+`visibility` hides model, plate and shadow together through one dispatcher gate, `held_item`
+and `shadow` bend just their layer, and `voice_pitch` resolves today for the voice mod that
+reads it tomorrow. Third-person distance needs no channel of its own: the camera already reads
+the `camera_distance` attribute, so it follows for free.
 
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied

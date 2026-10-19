@@ -77,6 +77,18 @@ public final class ChannelRegistry {
         // No sane default follows anything: hunger drain is per-action, so this one stays off
         // until set rather than deriving a rate from the scale.
         registerBuiltIn(new ChannelSpec("stature:saturation", ChannelFollow.NONE, 1.0, false));
+        // Multiplier channels, not attribute channels: knockback power and the voice line have no
+        // game base to be absolute about, so their overrides multiply rather than replace. Voice
+        // resolves today and drives nothing until a voice mod reads it.
+        registerBuiltIn(new ChannelSpec("stature:knockback_received", ChannelFollow.BASE, -0.5, false));
+        registerBuiltIn(new ChannelSpec("stature:knockback_dealt", ChannelFollow.BASE, 0.5, false));
+        registerBuiltIn(new ChannelSpec("stature:voice_pitch", ChannelFollow.BASE, -0.35, false));
+        // Render-only multipliers with no sane follow: each defaults to exactly 1, meaning vanilla
+        // behavior, and an override scales just that layer. The shadow already follows the uniform
+        // scale on its own; its channel only bends it further.
+        registerBuiltIn(new ChannelSpec("stature:visibility", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:held_item", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:shadow", ChannelFollow.NONE, 1.0, false));
     }
 
     private void registerBuiltIn(ChannelSpec spec) {

@@ -56,4 +56,39 @@ class RenderMixinContractTest {
         assertEquals(float.class, field.getType());
         assertTrue(java.lang.reflect.Modifier.isPublic(field.getModifiers()));
     }
+
+    @Test
+    void visibilityGatesTheDispatcherFunnel() throws Exception {
+        var method = net.minecraft.client.renderer.entity.EntityRenderDispatcher.class.getDeclaredMethod(
+                "submit",
+                net.minecraft.client.renderer.entity.state.EntityRenderState.class,
+                CameraRenderState.class,
+                double.class,
+                double.class,
+                double.class,
+                PoseStack.class,
+                SubmitNodeCollector.class);
+        assertEquals(void.class, method.getReturnType());
+    }
+
+    @Test
+    void shadowBendsAtGetShadowRadius() throws Exception {
+        var method = LivingEntityRenderer.class.getDeclaredMethod(
+                "getShadowRadius", LivingEntityRenderState.class);
+        assertEquals(float.class, method.getReturnType());
+    }
+
+    @Test
+    void heldItemsSubmitPerArm() throws Exception {
+        var method = net.minecraft.client.renderer.entity.layers.ItemInHandLayer.class.getDeclaredMethod(
+                "submitArmWithItem",
+                net.minecraft.client.renderer.entity.state.ArmedEntityRenderState.class,
+                net.minecraft.client.renderer.item.ItemStackRenderState.class,
+                net.minecraft.world.item.ItemStack.class,
+                net.minecraft.world.entity.HumanoidArm.class,
+                PoseStack.class,
+                SubmitNodeCollector.class,
+                int.class);
+        assertEquals(void.class, method.getReturnType());
+    }
 }

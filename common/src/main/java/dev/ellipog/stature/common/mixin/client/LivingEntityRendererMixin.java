@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Draws a shaped entity shaped (plan §14.2's "render matrices" half).
@@ -53,6 +54,7 @@ public abstract class LivingEntityRendererMixin {
             // is bit-for-bit what it was; set, the picture separates from the box on purpose.
             render.stature$pushFrame(entity.tickCount, partialTicks,
                     ChannelService.visualScale(entity, entity.getScale()), scaled.stature$axes());
+            render.stature$pushChannels(scaled.stature$channelOverrides());
         }
     }
 
@@ -76,5 +78,22 @@ public abstract class LivingEntityRendererMixin {
         float scale = render.stature$renderScale();
         ScaleAxes shape = render.stature$renderShape();
         poseStack.scale(scale * shape.width(), scale * shape.height(), scale * shape.depth());
+    }
+
+    @Inject(
+            method = "getShadowRadius(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;)F",
+            at = @At("RETURN"),
+            cancellable = true)
+    private void stature$scaleShadow(
+            LivingEntityRenderState state, CallbackInfoReturnable<Float> cir) {
+        // The radius already follows the uniform scale through vanilla's own multiply, so this
+        // only bends it further when asked. Subclasses that override and call super pass through
+        // here on the way, which is what makes one hook cover every living renderer.
+        if (state instanceof StatureRenderState render) {
+            float factor = render.stature$shadowFactor();
+            if (factor != 1.0F) {
+                cir.setReturnValue(cir.getReturnValue() * factor);
+            }
+        }
     }
 }

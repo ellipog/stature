@@ -1,5 +1,7 @@
 package dev.ellipog.stature.common.client;
 
+import java.util.Map;
+
 import dev.ellipog.stature.api.ScaleAxes;
 
 /**
@@ -15,6 +17,10 @@ import dev.ellipog.stature.api.ScaleAxes;
  * state answers with the blend between the last two ticks at the frame's partial tick: the hitbox
  * stays exactly on the server's numbers while the picture glides between them, which is the same
  * split vanilla itself uses for positions.
+ *
+ * <p>Channel overrides ride the same way, one step simpler: they change rarely and nobody blends
+ * them, so each frame replaces the whole map rather than versioning it. An empty map copies for
+ * free, and a small one costs less than the frame already spends.
  *
  * <p>Implemented by a mixin, hence the {@code stature$} prefix. This interface names no client class
  * itself, so it is safe to load on a dedicated server even though only a client ever uses it.
@@ -32,4 +38,16 @@ public interface StatureRenderState {
 
     /** The shape blended to this frame, or {@link ScaleAxes#UNIFORM} when nothing is pushed yet. */
     ScaleAxes stature$renderShape();
+
+    /** The channel overrides known this frame. Replaced whole, never merged. */
+    void stature$pushChannels(Map<String, Float> channels);
+
+    /** Whether the visibility channel hides this entity: set below one half, shown otherwise. */
+    boolean stature$hidden();
+
+    /** The held-item factor: the override, or exactly 1 when unset or corrupt. */
+    float stature$heldFactor();
+
+    /** The shadow factor: the override, or exactly 1 when unset or corrupt. */
+    float stature$shadowFactor();
 }

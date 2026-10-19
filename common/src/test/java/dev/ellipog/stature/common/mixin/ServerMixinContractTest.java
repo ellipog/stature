@@ -3,6 +3,7 @@ package dev.ellipog.stature.common.mixin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
@@ -49,5 +50,20 @@ class ServerMixinContractTest {
     void respawnCarriesThroughRestoreFrom() throws Exception {
         assertEquals(void.class, ServerPlayer.class
                 .getDeclaredMethod("restoreFrom", ServerPlayer.class, boolean.class).getReturnType());
+    }
+
+    @Test
+    void knockbackHasOneFunnelEachWay() throws Exception {
+        assertEquals(void.class, LivingEntity.class.getDeclaredMethod(
+                "knockback", double.class, double.class, double.class,
+                DamageSource.class, float.class, boolean.class).getReturnType());
+        assertEquals(float.class, LivingEntity.class.getDeclaredMethod(
+                "getKnockback", Entity.class, DamageSource.class).getReturnType());
+    }
+
+    @Test
+    void hungerFunnelsThroughCauseFoodExhaustion() throws Exception {
+        assertEquals(void.class, net.minecraft.world.entity.player.Player.class
+                .getDeclaredMethod("causeFoodExhaustion", float.class).getReturnType());
     }
 }

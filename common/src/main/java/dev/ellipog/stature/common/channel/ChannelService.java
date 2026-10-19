@@ -158,6 +158,41 @@ public final class ChannelService {
     }
 
     /**
+     * The multiplier for knockback this entity takes: the override, else the base scale to the
+     * negative root. A giant shrugs, a coblyn flies; an override multiplies either way.
+     */
+    public static float knockbackReceivedFactor(LivingEntity entity) {
+        return channelFactor(entity, "stature:knockback_received");
+    }
+
+    /** The multiplier for knockback this entity deals: the override, else the root of the base. */
+    public static float knockbackDealtFactor(LivingEntity entity) {
+        return channelFactor(entity, "stature:knockback_dealt");
+    }
+
+    /**
+     * A multiplier channel's number: its override, else its follow, else exactly 1.
+     *
+     * <p>Used only where the game holds no base to be absolute about -- a knockback power, a
+     * hunger amount -- so unlike attribute channels there is nothing to divide by and nothing
+     * that can be zero. A corrupt override degrades to neutral rather than poisoning physics
+     * with a NaN, for the same reason the packet clamps rather than throws.
+     */
+    static float channelFactor(LivingEntity entity, String id) {
+        StatureScale duck = (StatureScale) entity;
+        Float override = duck.stature$channelOverrides().get(id);
+        if (override != null) {
+            return override >= 0.0F ? override : 1.0F;
+        }
+        ChannelSpec spec = ChannelRegistry.instance().get(id);
+        if (spec == null) {
+            return 1.0F;
+        }
+        return spec.resolve(
+                ScaleService.stateOf(entity).scale(), duck.stature$axes(), null).orElse(1.0).floatValue();
+    }
+
+    /**
      * The hunger drain multiplier for this entity: the saturation override, else exactly 1.
      *
      * <p>Unlike attribute channels this one multiplies each incoming exhaustion amount rather than

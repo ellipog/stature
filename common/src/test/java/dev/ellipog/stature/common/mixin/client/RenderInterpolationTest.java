@@ -1,6 +1,10 @@
 package dev.ellipog.stature.common.mixin.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Map;
 
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.client.StatureRenderState;
@@ -69,5 +73,36 @@ class RenderInterpolationTest {
 
         assertEquals(1.0F, state.stature$renderScale(), DELTA);
         assertEquals(ScaleAxes.UNIFORM, state.stature$renderShape());
+        assertFalse(state.stature$hidden());
+        assertEquals(1.0F, state.stature$heldFactor(), DELTA);
+        assertEquals(1.0F, state.stature$shadowFactor(), DELTA);
+    }
+
+    @Test
+    void pushedChannelsReadBackWhole() {
+        StatureRenderState state = freshState();
+        state.stature$pushChannels(Map.of("stature:visibility", 0.0F, "stature:held_item", 2.0F));
+
+        assertTrue(state.stature$hidden());
+        assertEquals(2.0F, state.stature$heldFactor(), DELTA);
+        assertEquals(1.0F, state.stature$shadowFactor(), DELTA);
+    }
+
+    @Test
+    void aLaterPushReplacesTheWholeMap() {
+        StatureRenderState state = freshState();
+        state.stature$pushChannels(Map.of("stature:visibility", 0.0F));
+        state.stature$pushChannels(Map.of());
+
+        assertFalse(state.stature$hidden());
+    }
+
+    @Test
+    void corruptFactorsDegradeToNeutral() {
+        StatureRenderState state = freshState();
+        state.stature$pushChannels(Map.of("stature:shadow", Float.NaN, "stature:held_item", -3.0F));
+
+        assertEquals(1.0F, state.stature$shadowFactor(), DELTA);
+        assertEquals(1.0F, state.stature$heldFactor(), DELTA);
     }
 }
