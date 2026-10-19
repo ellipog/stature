@@ -31,6 +31,30 @@ public final class Thresholds {
                 && StatureConfig.isMicro(entity);
     }
 
+    /** Whether this entity slips through bars, fences and bamboo. */
+    public static boolean canPassThrough(LivingEntity entity) {
+        return StatureConfig.enabled(entity, StatureConfig.POROUS_TRAVERSAL)
+                && StatureConfig.isMicro(entity);
+    }
+
+    /** Louder steps for macro entities, vanilla volume for everything else. */
+    public static float stepVolume(LivingEntity entity, float base) {
+        if (!StatureConfig.enabled(entity, StatureConfig.SEISMIC_FOOTSTEPS)
+                || !StatureConfig.isMacro(entity)) {
+            return base;
+        }
+        return Math.min(base * ScaleService.stateOf(entity).scale(), 1.0F);
+    }
+
+    /** Deeper steps for macro entities, vanilla pitch for everything else. */
+    public static float stepPitch(LivingEntity entity, float base) {
+        if (!StatureConfig.enabled(entity, StatureConfig.SEISMIC_FOOTSTEPS)
+                || !StatureConfig.isMacro(entity)) {
+            return base;
+        }
+        return (float) (base / Math.sqrt(ScaleService.stateOf(entity).scale()));
+    }
+
     /** Breaking and hurting. Server-only, called from the entity tick hook. */
     public static void tick(LivingEntity entity) {
         trample(entity);

@@ -3,6 +3,8 @@ package dev.ellipog.stature.common.mixin;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.Thresholds;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
@@ -19,6 +21,9 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -81,6 +86,28 @@ public abstract class EntityMixin {
      * past it was written under the modifier regime and needs no repair.
      */
     private static final int SAVE_FORMAT = 2;
+
+    /**
+     * Gives macro entities heavier footsteps: the same terminal sound call vanilla ends at,
+     * with volume up and pitch down by scale. Reimplemented rather than argument-tweaked
+     * because the call between here and there differs per loader; this shape is vanilla on
+     * both. Carpet-muffled steps bypass this method and stay vanilla-pitched.
+     */
+    @Inject(
+            method = "playStepSound(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V",
+            at = @At("HEAD"),
+            cancellable = true)
+    private void stature$stepSeismic(BlockPos pos, BlockState blockState, CallbackInfo info) {
+        if ((Object) this instanceof LivingEntity living
+                && StatureConfig.enabled(living, StatureConfig.SEISMIC_FOOTSTEPS)
+                && StatureConfig.isMacro(living)) {
+            SoundType soundType = blockState.getSoundType();
+            living.playSound(soundType.getStepSound(),
+                    soundType.getVolume() * Thresholds.stepVolume(living, 0.15F),
+                    soundType.getPitch() * Thresholds.stepPitch(living, 1.0F));
+            info.cancel();
+        }
+    }
 
     @Inject(method = "makeBoundingBox(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/AABB;",
             at = @At("HEAD"), cancellable = true)

@@ -95,4 +95,28 @@ class ServerMixinContractTest {
         assertEquals(boolean.class, LivingEntity.class
                 .getDeclaredMethod("onClimbable").getReturnType());
     }
+
+    @Test
+    void porousBlocksShareOneCollisionShape() throws Exception {
+        var shape = net.minecraft.world.phys.shapes.VoxelShape.class;
+        var params = new Class<?>[]{
+                net.minecraft.world.level.block.state.BlockState.class,
+                net.minecraft.world.level.BlockGetter.class,
+                net.minecraft.core.BlockPos.class,
+                net.minecraft.world.phys.shapes.CollisionContext.class};
+        assertEquals(shape, net.minecraft.world.level.block.state.BlockBehaviour.class
+                .getDeclaredMethod("getCollisionShape", params).getReturnType());
+        assertEquals(shape, net.minecraft.world.level.block.BambooStalkBlock.class
+                .getDeclaredMethod("getCollisionShape", params).getReturnType());
+        assertEquals(shape, net.minecraft.world.level.block.CrossCollisionBlock.class
+                .getDeclaredMethod("getCollisionShape", params).getReturnType());
+    }
+
+    @Test
+    void stepsSoundThroughPlayStepSound() throws Exception {
+        var method = Entity.class.getDeclaredMethod("playStepSound",
+                net.minecraft.core.BlockPos.class,
+                net.minecraft.world.level.block.state.BlockState.class);
+        assertEquals(void.class, method.getReturnType());
+    }
 }

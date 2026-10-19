@@ -169,10 +169,13 @@ that degrades to a normal hit past walls or out of reach. Measured: equal-speed 
 ```
 
 `config/stature.json` holds the two tier edges and a flag per mechanic; frames override any
-of them per entity. Below micro, walls climb like ladders; above macro, leaves, panes and
-crops break on contact and low ceilings compress for 2.0 every second. Knockback already
-followed the root law at every scale, so its flag only disables the follow. Measured: a
-macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve seconds.
+of them per entity. Below micro, walls climb like ladders and bars, fences and bamboo let
+small things through (panes stay walls). Above macro, leaves, panes and crops break on
+contact, low ceilings compress for 2.0 every second, and footsteps land louder and deeper.
+Knockback already followed the root law at every scale, so its flag only disables the
+follow. Measured: a 0.2 zombie fell through bars onto stone while a vanilla one landed on
+top, a macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve
+seconds.
 
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied
