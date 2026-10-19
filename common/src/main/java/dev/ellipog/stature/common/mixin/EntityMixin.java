@@ -7,6 +7,7 @@ import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
 import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.parts.PartService;
 
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
@@ -16,7 +17,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
@@ -138,6 +138,7 @@ public abstract class EntityMixin {
 
         // Overrides travel; easing progress does not. A load lands, it never resumes a glide.
         ChannelService.save((LivingEntity) (Object) this, output);
+        PartService.save(scaled, output);
     }
 
     @Inject(method = "load", at = @At("TAIL"))
@@ -161,13 +162,16 @@ public abstract class EntityMixin {
         }).orElse(null);
 
         // Channels ride separately from the box: an entity can carry overrides with a vanilla
-        // box, and that alone must keep it out of the early return below.
+        // box, and that alone must keep it out of the early return below. Parts ride the same
+        // way, on their own keys.
         boolean channels = scaled instanceof LivingEntity living
                 ? ChannelService.load(living, input)
                 : false;
+        boolean parts = PartService.load(scaled, input);
 
         if (width == 1.0F && height == 1.0F && depth == 1.0F
-                && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null && source == null && !channels) {
+                && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null && source == null
+                && !channels && !parts) {
             return;
         }
 

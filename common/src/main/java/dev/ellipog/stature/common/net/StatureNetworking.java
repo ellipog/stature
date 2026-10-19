@@ -1,5 +1,6 @@
 package dev.ellipog.stature.common.net;
 
+import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.StatureScale;
 
@@ -35,6 +36,12 @@ public final class StatureNetworking {
 
         /** One player, for channel overrides they have not been sent yet. */
         void sendTo(ServerPlayer player, ChannelsPayload payload);
+
+        /** Everyone who could see this entity, for its part factors. */
+        void broadcast(LivingEntity entity, PartsPayload payload);
+
+        /** One player, for part factors they have not been sent yet. */
+        void sendTo(ServerPlayer player, PartsPayload payload);
     }
 
     private static Network installed;
@@ -67,6 +74,18 @@ public final class StatureNetworking {
     public static void sendTo(ServerPlayer player, LivingEntity entity, Map<String, Float> channels) {
         if (installed != null) {
             installed.sendTo(player, new ChannelsPayload(entity.getId(), channels));
+        }
+    }
+
+    public static void broadcastParts(LivingEntity entity, Map<String, ScaleAxes> parts) {
+        if (installed != null) {
+            installed.broadcast(entity, new PartsPayload(entity.getId(), parts));
+        }
+    }
+
+    public static void sendPartsTo(ServerPlayer player, LivingEntity entity, Map<String, ScaleAxes> parts) {
+        if (installed != null) {
+            installed.sendTo(player, new PartsPayload(entity.getId(), parts));
         }
     }
 

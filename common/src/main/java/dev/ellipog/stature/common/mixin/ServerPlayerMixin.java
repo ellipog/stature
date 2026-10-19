@@ -43,6 +43,10 @@ public abstract class ServerPlayerMixin {
         duck.stature$setFrame(oldDuck.stature$frame());
         duck.stature$setEyeHeight(oldDuck.stature$eyeHeight());
         duck.stature$setFrameSource(source);
+        // Part factors travel with the surviving sources below; anything else re-resolves its
+        // frame on first tick, which re-applies its parts. Transitions never travel.
+        duck.stature$partFactors().clear();
+        duck.stature$partFactors().putAll(oldDuck.stature$partFactors());
         // Instant and linear: this is a restoration, not a change, so there is nothing to ease.
         // The apply broadcasts, which unknown-id receivers drop and tracking then repeats.
         ScaleService.setSize(self, oldState, 0, Easing.LINEAR);

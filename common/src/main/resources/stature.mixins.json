@@ -14,7 +14,9 @@
         "client.EntityRenderDispatcherMixin",
         "client.ItemInHandLayerMixin",
         "client.LivingEntityRendererMixin",
-        "client.LivingEntityRenderStateMixin"
+        "client.LivingEntityRenderStateMixin",
+        "client.ModelFeatureRendererMixin",
+        "client.ModelPartMixin"
     ],
     "injectors": {
         "defaultRequire": 1

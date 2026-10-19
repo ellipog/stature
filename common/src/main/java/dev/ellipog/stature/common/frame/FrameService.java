@@ -1,13 +1,21 @@
 package dev.ellipog.stature.common.frame;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import dev.ellipog.stature.api.AxesTransition;
 import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.FrameSpec;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.parts.PartService;
+import dev.ellipog.stature.common.parts.RigRegistry;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
@@ -17,6 +25,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EntityDimensions;
 
 import org.jetbrains.annotations.Nullable;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Puts a frame onto an entity and decides which frame wins (plan §14.8).
@@ -37,6 +48,8 @@ import org.jetbrains.annotations.Nullable;
  * an operator; pack reloads re-evaluate only automatic and not-yet-decided entities.
  */
 public final class FrameService {
+
+    private static final Logger LOG = LoggerFactory.getLogger("stature");
 
     private FrameService() {
     }
@@ -90,7 +103,10 @@ public final class FrameService {
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.NONE);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$partFactors().clear();
+        duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
+        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
         return true;
     }
 
@@ -151,7 +167,10 @@ public final class FrameService {
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.MANUAL);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$partFactors().clear();
+        duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
+        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
     }
 
     /** Applies a pack declaration the first time an undecided server-side entity ticks. */
@@ -217,23 +236,70 @@ public final class FrameService {
     }
 
     private static boolean applyAs(LivingEntity entity, Identifier frameId, int ticks, FrameSource source) {
-        FrameSpec frame = StatureFrames.get(frameId);
-        if (frame == null) {
+        FrameFile file = StatureFrames.file(frameId);
+        if (file == null) {
             return false;
         }
+        FrameSpec frame = file.spec();
 
         EntityDimensions base = entity.getType().getDimensions();
-        ScaleAxes axes = frame.axesFor(base.width(), base.height());
+        Map<String, ScaleAxes> parts = resolveParts(file);
+        ScaleAxes axes = file.hitboxFromParts() && !parts.isEmpty()
+                ? PartService.envelope(parts)
+                : frame.axesFor(base.width(), base.height());
 
         StatureScale duck = (StatureScale) entity;
         duck.stature$setFrame(frameId);
         duck.stature$setFrameSource(source);
         duck.stature$setEyeHeight(frame.hasEyeHeight() ? frame.eyeHeight() : StatureScale.NO_EYE_HEIGHT);
+        duck.stature$partFactors().clear();
+        duck.stature$partFactors().putAll(parts);
+        duck.stature$partTransitions().clear();
+        if (ticks > 0) {
+            for (Map.Entry<String, ScaleAxes> entry : parts.entrySet()) {
+                duck.stature$partTransitions().put(entry.getKey(), AxesTransition.between(
+                        ScaleAxes.UNIFORM, entry.getValue(), ticks, frame.easing()));
+            }
+        }
 
         // The frame's own scale, not the entity's current one: applying a frame is choosing a size,
         // and a caller who wants a different scale can follow it with /stature set.
         ScaleService.setSize(entity, new ScaleState(frame.scale(), axes), ticks, frame.easing());
+        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
         return true;
+    }
+
+    /**
+     * Turns a frame's group-named parts into path-keyed factors.
+     *
+     * <p>Groups resolve through the frame's rig in sorted order so overlaps are deterministic;
+     * unknown groups and bad triplets are warned about and skipped rather than failing the frame.
+     * Transitions start from vanilla because a frame owns the whole silhouette: what was there
+     * before belonged to whatever is being replaced.
+     */
+    private static Map<String, ScaleAxes> resolveParts(FrameFile file) {
+        Map<String, ScaleAxes> resolved = new LinkedHashMap<>();
+        List<String> groups = new ArrayList<>(file.parts().keySet());
+        groups.sort(String::compareTo);
+        for (String group : groups) {
+            List<String> paths = RigRegistry.instance().resolve(file.rig(), group);
+            if (paths.isEmpty()) {
+                LOG.warn("frame {} names part group \"{}\" nothing resolves; skipping it", file.id(), group);
+                continue;
+            }
+            List<Float> triplet = file.parts().get(group);
+            ScaleAxes factors;
+            try {
+                factors = new ScaleAxes(triplet.get(0), triplet.get(1), triplet.get(2));
+            } catch (RuntimeException e) {
+                LOG.warn("frame {} part \"{}\" is not a positive size; skipping it", file.id(), group);
+                continue;
+            }
+            for (String path : paths) {
+                resolved.put(path, factors);
+            }
+        }
+        return resolved;
     }
 
     private static boolean refreshOne(LivingEntity entity) {
@@ -276,7 +342,10 @@ public final class FrameService {
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.DEFAULT);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$partFactors().clear();
+        duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
+        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
     }
 
 }

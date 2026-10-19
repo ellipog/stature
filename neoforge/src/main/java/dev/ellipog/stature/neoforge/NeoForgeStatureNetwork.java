@@ -2,6 +2,7 @@ package dev.ellipog.stature.neoforge;
 
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.server.level.ServerLevel;
@@ -40,6 +41,18 @@ final class NeoForgeStatureNetwork implements StatureNetworking.Network {
 
     @Override
     public void sendTo(ServerPlayer player, ChannelsPayload payload) {
+        PacketDistributor.sendToPlayer(player, payload);
+    }
+
+    @Override
+    public void broadcast(LivingEntity entity, PartsPayload payload) {
+        if (entity.level() instanceof ServerLevel level) {
+            PacketDistributor.sendToPlayersInDimension(level, payload);
+        }
+    }
+
+    @Override
+    public void sendTo(ServerPlayer player, PartsPayload payload) {
         PacketDistributor.sendToPlayer(player, payload);
     }
 }

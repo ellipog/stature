@@ -51,6 +51,9 @@ public abstract class LivingEntityRenderStateMixin implements StatureRenderState
     @Unique
     private Map<String, Float> stature$channels;
 
+    @Unique
+    private Map<String, ScaleAxes> stature$parts;
+
     @Override
     public void stature$pushFrame(int tick, float partialTick, float scale, ScaleAxes shape) {
         if (!this.stature$hasHistory || tick < this.stature$lastTick) {
@@ -105,6 +108,16 @@ public abstract class LivingEntityRenderStateMixin implements StatureRenderState
     @Override
     public float stature$shadowFactor() {
         return stature$factor("stature:shadow");
+    }
+
+    @Override
+    public void stature$pushParts(Map<String, ScaleAxes> parts) {
+        this.stature$parts = Map.copyOf(parts);
+    }
+
+    @Override
+    public Map<String, ScaleAxes> stature$partFactors() {
+        return this.stature$parts == null ? Map.of() : this.stature$parts;
     }
 
     /** This frame's overrides, or nothing when no frame has pushed yet. */

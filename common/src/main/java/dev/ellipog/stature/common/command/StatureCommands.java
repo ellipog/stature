@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -25,6 +27,9 @@ import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelRegistry;
 import dev.ellipog.stature.common.channel.ChannelService;
+import dev.ellipog.stature.common.parts.PartService;
+import dev.ellipog.stature.common.parts.RigRegistry;
+import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
 
@@ -88,6 +93,7 @@ public final class StatureCommands {
         sizeBranch(root);
         frameBranch(root);
         channelBranch(root);
+        partBranch(root);
 
         root.then(Commands.literal("get")
                 .executes(context -> get(context, context.getSource().getEntity()))
@@ -181,6 +187,40 @@ public final class StatureCommands {
                         .then(channel
                                 .then(value)
                                 .then(Commands.literal("reset").executes(StatureCommands::resetChannel)))));
+    }
+
+    /**
+     * One part at a time, as a group name or a raw dot path. Groups resolve through the entity's
+     * rig at set time and travel as paths after that, so a later rig change never reinterprets
+     * what was set. Dots are legal here, so unlike channels this argument is a plain string.
+     */
+    private static void partBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
+        RequiredArgumentBuilder<CommandSourceStack, String> part =
+                Commands.argument("part", StringArgumentType.string())
+                        .suggests(StatureCommands::suggestParts);
+
+        RequiredArgumentBuilder<CommandSourceStack, Double> depth =
+                Commands.argument("depth", DoubleArgumentType.doubleArg(ScaleLimits.MIN, ScaleLimits.MAX))
+                        .executes(context -> setPart(context, 0));
+
+        depth.then(Commands.argument("ticks", IntegerArgumentType.integer(0, MAX_TICKS))
+                .executes(context -> setPart(context, IntegerArgumentType.getInteger(context, "ticks"))));
+
+        RequiredArgumentBuilder<CommandSourceStack, Double> height =
+                Commands.argument("height", DoubleArgumentType.doubleArg(ScaleLimits.MIN, ScaleLimits.MAX))
+                        .then(depth);
+
+        RequiredArgumentBuilder<CommandSourceStack, Double> width =
+                Commands.argument("width", DoubleArgumentType.doubleArg(ScaleLimits.MIN, ScaleLimits.MAX))
+                        .then(height);
+
+        root.then(Commands.literal("part")
+                .then(Commands.argument("targets", EntityArgument.entities())
+                        .then(Commands.literal("list").executes(StatureCommands::listParts))
+                        .then(Commands.literal("reset").executes(StatureCommands::resetAllParts))
+                        .then(part
+                                .then(width)
+                                .then(Commands.literal("reset").executes(StatureCommands::resetPart)))));
     }
 
     /**
@@ -323,6 +363,124 @@ public final class StatureCommands {
         return report(context, listed);
     }
 
+    /** The default rig's group names, offered as completions. Raw dot paths type blind. */
+    private static CompletableFuture<Suggestions> suggestParts(
+            CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
+        return SharedSuggestionProvider.suggest(
+                RigRegistry.instance().groups(PartService.DEFAULT_RIG), builder);
+    }
+
+    private static int setPart(CommandContext<CommandSourceStack> context, int ticks)
+            throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+        String name = StringArgumentType.getString(context, "part");
+        float width = (float) DoubleArgumentType.getDouble(context, "width");
+        float height = (float) DoubleArgumentType.getDouble(context, "height");
+        float depth = (float) DoubleArgumentType.getDouble(context, "depth");
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            List<String> paths = RigRegistry.instance().resolve(PartService.rigOf(living), name);
+            if (paths.isEmpty()) {
+                continue;
+            }
+            ScaleAxes factors;
+            try {
+                factors = new ScaleAxes(width, height, depth);
+            } catch (IllegalArgumentException bad) {
+                context.getSource().sendFailure(
+                        Component.translatable("stature.command.part.badvalue"));
+                return 0;
+            }
+            for (String path : paths) {
+                PartService.setPart(living, path, factors, ticks, Easing.EASE_OUT_CUBIC);
+            }
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.part.set.success",
+                            living.getDisplayName(), name, number(width), number(height), number(depth)),
+                    true);
+        }
+        if (changed == 0) {
+            context.getSource().sendFailure(
+                    Component.translatable("stature.command.part.unknown", name));
+            return 0;
+        }
+        return changed;
+    }
+
+    private static int resetPart(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+        String name = StringArgumentType.getString(context, "part");
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            List<String> paths = RigRegistry.instance().resolve(PartService.rigOf(living), name);
+            if (paths.isEmpty()) {
+                continue;
+            }
+            for (String path : paths) {
+                PartService.resetPart(living, path);
+            }
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.part.reset.success", living.getDisplayName(), name),
+                    true);
+        }
+        if (changed == 0) {
+            context.getSource().sendFailure(
+                    Component.translatable("stature.command.part.unknown", name));
+            return 0;
+        }
+        return changed;
+    }
+
+    private static int resetAllParts(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            PartService.resetAllParts(living);
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.part.reset.all.success", living.getDisplayName()),
+                    true);
+        }
+        return report(context, changed);
+    }
+
+    private static int listParts(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+
+        int listed = 0;
+        for (LivingEntity living : living(targets)) {
+            Map<String, ScaleAxes> factors = ((StatureScale) living).stature$partFactors();
+            if (factors.isEmpty()) {
+                context.getSource().sendSuccess(
+                        () -> Component.translatable(
+                                "stature.command.part.list.empty", living.getDisplayName()),
+                        false);
+                listed++;
+                continue;
+            }
+            List<String> entries = new ArrayList<>();
+            for (Map.Entry<String, ScaleAxes> entry : factors.entrySet()) {
+                ScaleAxes shape = entry.getValue();
+                entries.add((entry.getKey().isEmpty() ? "all" : entry.getKey()) + "="
+                        + number(shape.width()) + " x " + number(shape.height()) + " x " + number(shape.depth()));
+            }
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.part.list", living.getDisplayName(), String.join(", ", entries)),
+                    false);
+            listed++;
+        }
+        return report(context, listed);
+    }
+
     private static int applyFrame(CommandContext<CommandSourceStack> context, int ticks) throws CommandSyntaxException {
         Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
         Identifier frameId = IdentifierArgument.getId(context, "frame");
@@ -380,6 +538,7 @@ public final class StatureCommands {
 
     private static int reload(CommandContext<CommandSourceStack> context) {
         int count = StatureFrames.load(context.getSource().getServer().getResourceManager());
+        RigRegistry.instance().load(context.getSource().getServer().getResourceManager());
         int updated = FrameService.refreshAutomatic(context.getSource().getServer());
         context.getSource().sendSuccess(
                 () -> Component.translatable("stature.command.reload", count, updated), false);

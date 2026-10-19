@@ -42,6 +42,14 @@ public interface StatureRenderState {
     /** The channel overrides known this frame. Replaced whole, never merged. */
     void stature$pushChannels(Map<String, Float> channels);
 
+    /**
+     * The part factors known this frame, keyed by model path. Same replace-whole rule as
+     * channels: the server owns the map and this frame either has the latest copy or nothing.
+     */
+    void stature$pushParts(Map<String, ScaleAxes> parts);
+
+    /** The pushed part factors, or an empty map when no frame pushed any. */
+    Map<String, ScaleAxes> stature$partFactors();
     /** Whether the visibility channel hides this entity: set below one half, shown otherwise. */
     boolean stature$hidden();
 

@@ -4,8 +4,12 @@ import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
 import dev.ellipog.stature.common.frame.StatureFrames;
+import dev.ellipog.stature.common.parts.PartService;
+import dev.ellipog.stature.common.parts.RigRegistry;
+import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.fabricmc.api.ModInitializer;
@@ -44,6 +48,7 @@ public final class StatureFabric implements ModInitializer {
         // playS2C()/playC2S() pair that the older Fabric API used.
         PayloadTypeRegistry.clientboundPlay().register(AxesPayload.TYPE, AxesPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(PartsPayload.TYPE, PartsPayload.STREAM_CODEC);
         StatureNetworking.install(new FabricStatureNetwork());
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
@@ -55,12 +60,18 @@ public final class StatureFabric implements ModInitializer {
                 if (ChannelService.hasSyncedState(living)) {
                     StatureNetworking.sendTo(player, living, ChannelService.syncMap(living));
                 }
+                if (PartService.hasParts(living)) {
+                    StatureNetworking.sendPartsTo(player, living, PartService.syncMap(living));
+                }
             }
         });
 
         // Frames are data, so they are read once the server's packs are: a datapack's own frames are
         // not available before that, and /stature reload re-reads them after a pack change.
-        ServerLifecycleEvents.SERVER_STARTED.register(server -> StatureFrames.load(server.getResourceManager()));
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            StatureFrames.load(server.getResourceManager());
+            RigRegistry.instance().load(server.getResourceManager());
+        });
 
         LOG.info("Stature loaded");
     }

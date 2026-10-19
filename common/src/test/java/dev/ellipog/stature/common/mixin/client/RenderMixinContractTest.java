@@ -91,4 +91,28 @@ class RenderMixinContractTest {
                 int.class);
         assertEquals(void.class, method.getReturnType());
     }
+
+    @Test
+    void partFactorsResolveFromModelRoots() throws Exception {
+        var root = net.minecraft.client.model.Model.class.getDeclaredMethod("root");
+        assertEquals(net.minecraft.client.model.geom.ModelPart.class, root.getReturnType());
+        var child = net.minecraft.client.model.geom.ModelPart.class.getDeclaredMethod(
+                "getChild", String.class);
+        assertEquals(net.minecraft.client.model.geom.ModelPart.class, child.getReturnType());
+    }
+
+    @Test
+    void modelConsumptionSeesModelAndStateTogether() throws Exception {
+        var method = net.minecraft.client.renderer.feature.ModelFeatureRenderer.class.getDeclaredMethod(
+                "prepareModel",
+                Class.forName("net.minecraft.client.renderer.feature.ModelFeatureRenderer$Submit"));
+        assertEquals(void.class, method.getReturnType());
+    }
+
+    @Test
+    void posesLandInTranslateAndRotate() throws Exception {
+        var method = net.minecraft.client.model.geom.ModelPart.class.getDeclaredMethod(
+                "translateAndRotate", PoseStack.class);
+        assertEquals(void.class, method.getReturnType());
+    }
 }

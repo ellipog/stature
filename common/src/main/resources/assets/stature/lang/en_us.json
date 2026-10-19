@@ -18,5 +18,12 @@
     "stature.command.channel.reset.success": "Reset %s channel %s to following the base",
     "stature.command.channel.unknown": "No channel named %s (see /stature channel <targets> list)",
     "stature.command.channel.badvalue": "Channel values must be finite numbers",
-    "stature.command.channel.list": "%s channels: %s"
+    "stature.command.channel.list": "%s channels: %s",
+    "stature.command.part.set.success": "Set %s part %s to %s x %s x %s",
+    "stature.command.part.reset.success": "Reset %s part %s to vanilla",
+    "stature.command.part.reset.all.success": "Reset every part on %s to vanilla",
+    "stature.command.part.unknown": "No part or group named %s on that rig (raw dot paths type blind)",
+    "stature.command.part.badvalue": "Part factors must be positive finite numbers",
+    "stature.command.part.list": "%s parts: %s",
+    "stature.command.part.list.empty": "%s has no part factors"
 }

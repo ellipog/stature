@@ -2,8 +2,10 @@ package dev.ellipog.stature.common.frame;
 
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.gson.JsonArray;
@@ -53,7 +55,8 @@ public final class FrameCodec {
 
     /** Fields this build understands. Anything else is reported once per file. */
     private static final Set<String> KNOWN = Set.of(
-            "size", "scale", "eye_height", "easing", "entities", "entity_tags", "comment", "$schema");
+            "size", "scale", "eye_height", "easing", "entities", "entity_tags",
+            "rig", "parts", "hitbox_from_parts", "comment", "$schema");
 
     /** Conventionally a schema pointer or prose, and never a frame's business. */
     private static final Set<String> IGNORED_SILENTLY = Set.of("comment", "$schema");
@@ -89,6 +92,9 @@ public final class FrameCodec {
         Easing easing = easing(source, json);
         List<Identifier> entities = ids(source, json, "entities");
         List<TagKey<EntityType<?>>> tags = tags(source, json, "entity_tags");
+        String rig = optionalId(source, json, "rig", "stature:humanoid");
+        Map<String, List<Float>> parts = parts(source, json);
+        boolean hitboxFromParts = optionalFlag(source, json, "hitbox_from_parts");
 
         StringBuilder unknown = new StringBuilder();
         for (String key : json.keySet()) {
@@ -103,7 +109,8 @@ public final class FrameCodec {
         }
 
         try {
-            return new FrameFile(id, new FrameSpec(scale, size[0], size[1], size[2], eyeHeight, easing), entities, tags);
+            return new FrameFile(id, new FrameSpec(scale, size[0], size[1], size[2], eyeHeight, easing),
+                    entities, tags, rig, parts, hitboxFromParts);
         } catch (IllegalArgumentException e) {
             throw new FrameFormatException(source + ": " + e.getMessage(), e);
         }
@@ -224,8 +231,67 @@ public final class FrameCodec {
         return values;
     }
 
-    private static String shortName(Easing easing) {
-        return switch (easing) {
+    /** An id string, defaulting when the field is absent. */
+    private static String optionalId(String source, JsonObject json, String field, String fallback)
+            throws FrameFormatException {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return fallback;
+        }
+        if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
+            throw new FrameFormatException(source + ": \"" + field + "\" must be an id string, got " + kindOf(element));
+        }
+        return element.getAsString().trim();
+    }
+
+    /** A flag, off when absent. */
+    private static boolean optionalFlag(String source, JsonObject json, String field)
+            throws FrameFormatException {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return false;
+        }
+        if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isBoolean()) {
+            throw new FrameFormatException(source + ": \"" + field + "\" must be true or false, got " + kindOf(element));
+        }
+        return element.getAsBoolean();
+    }
+
+    /**
+     * Part factors by group name, or empty when the field is absent. Values stay raw triplets
+     * here: group resolution and factor validation happen at apply time, where the rig and the
+     * entity are both in hand.
+     */
+    private static Map<String, List<Float>> parts(String source, JsonObject json) throws FrameFormatException {
+        JsonElement element = json.get("parts");
+        if (element == null || element.isJsonNull()) {
+            return Map.of();
+        }
+        if (!element.isJsonObject()) {
+            throw new FrameFormatException(source + ": \"parts\" must be an object of name to [x, y, z], got "
+                    + kindOf(element));
+        }
+
+        Map<String, List<Float>> parts = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+            if (!entry.getValue().isJsonArray() || entry.getValue().getAsJsonArray().size() != 3) {
+                throw new FrameFormatException(source + ": part \"" + entry.getKey()
+                        + "\" must be [x, y, z], got " + kindOf(entry.getValue()));
+            }
+            List<Float> factors = new ArrayList<>(3);
+            for (JsonElement number : entry.getValue().getAsJsonArray()) {
+                if (!number.isJsonPrimitive() || !number.getAsJsonPrimitive().isNumber()) {
+                    throw new FrameFormatException(source + ": part \"" + entry.getKey()
+                            + "\" must hold numbers, got " + kindOf(number));
+                }
+                factors.add(number.getAsFloat());
+            }
+            parts.put(entry.getKey(), List.copyOf(factors));
+        }
+        return Map.copyOf(parts);
+    }
+
+    private static String shortName(Easing easing) {        return switch (easing) {
             case LINEAR -> "LINEAR";
             case EASE_OUT_CUBIC -> "CUBIC";
             case ELASTIC -> "ELASTIC";

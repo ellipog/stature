@@ -5,6 +5,7 @@ import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
 import dev.ellipog.stature.api.ChannelTransition;
+import dev.ellipog.stature.api.AxesTransition;
 import dev.ellipog.stature.common.frame.FrameSource;
 
 import java.util.Map;
@@ -99,6 +100,15 @@ public interface StatureScale {
      * their effects, and a hand edit here bypasses all of that.
      */
     Map<String, ChannelTransition> stature$channelTransitions();
+
+    /**
+     * This entity's part factors by model path, live. Empty means a vanilla silhouette; use
+     * {@code PartService}, not this map, for the same lifecycle reasons as channels.
+     */
+    Map<String, ScaleAxes> stature$partFactors();
+
+    /** In-flight part changes, same deal. */
+    Map<String, AxesTransition> stature$partTransitions();
 
     /** The frame's eye height in blocks at scale 1, or {@link #NO_EYE_HEIGHT}. */
     float stature$eyeHeight();

@@ -55,6 +55,7 @@ public abstract class LivingEntityRendererMixin {
             render.stature$pushFrame(entity.tickCount, partialTicks,
                     ChannelService.visualScale(entity, entity.getScale()), scaled.stature$axes());
             render.stature$pushChannels(scaled.stature$channelOverrides());
+            render.stature$pushParts(scaled.stature$partFactors());
         }
     }
 

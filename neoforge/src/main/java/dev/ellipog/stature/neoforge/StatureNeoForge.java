@@ -6,8 +6,11 @@ import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
 import dev.ellipog.stature.common.frame.StatureFrames;
+import dev.ellipog.stature.common.parts.PartService;
+import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -60,6 +63,14 @@ public final class StatureNeoForge {
                                 duck.stature$channelOverrides().clear();
                                 duck.stature$channelOverrides().putAll(payload.channels());
                             }
+                        })).playToClient(PartsPayload.TYPE, PartsPayload.STREAM_CODEC,
+                        (payload, context) -> context.enqueueWork(() -> {
+                            Entity entity = context.player().level().getEntity(payload.entityId());
+                            if (entity instanceof LivingEntity living) {
+                                StatureScale duck = (StatureScale) living;
+                                duck.stature$partFactors().clear();
+                                duck.stature$partFactors().putAll(payload.parts());
+                            }
                         })));
 
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) ->
@@ -72,13 +83,18 @@ public final class StatureNeoForge {
                 if (ChannelService.hasSyncedState(living)) {
                     StatureNetworking.sendTo(player, living, ChannelService.syncMap(living));
                 }
+                if (PartService.hasParts(living)) {
+                    StatureNetworking.sendPartsTo(player, living, PartService.syncMap(living));
+                }
             }
         });
 
         // Frames are data, so they are read once the server's packs are: a datapack's own frames are
         // not available before that, and /stature reload re-reads them after a pack change.
-        NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) ->
-                StatureFrames.load(event.getServer().getResourceManager()));
+        NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) -> {
+            StatureFrames.load(event.getServer().getResourceManager());
+            RigRegistry.instance().load(event.getServer().getResourceManager());
+        });
 
         LOG.info("Stature loaded");
     }

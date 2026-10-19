@@ -127,6 +127,23 @@ and `shadow` bend just their layer, and `voice_pitch` resolves today for the voi
 reads it tomorrow. Third-person distance needs no channel of its own: the camera already reads
 the `camera_distance` attribute, so it follows for free.
 
+## Per-part scaling
+
+```cmd
+/stature part <targets> <part> <x> <y> <z> [ticks]   one group or raw dot path
+/stature part <targets> <part> reset                  back to vanilla
+/stature part <targets> reset                        the whole silhouette
+/stature part <targets> list                         what is set, as paths
+```
+
+Parts are multipliers in context: `{ "head": [1.15, 1.0, 1.15] }` widens one head, and the same
+entry on a giant widens it inside the giant's frame. Groups (`head`, `torso`, `arm.left`) resolve
+through rig profiles, defaulting to humanoid, with raw dot paths (`body.left_arm`) accepted
+anywhere; packs extend the vocabulary with their own rig files. The seam is the pose, so armor,
+elytra and held layers follow the same nodes. The box never follows parts except through
+`hitbox_from_parts`, which derives one presence box from the largest factors. First-person hands
+are vanilla's separate rig and do not follow yet.
+
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied
 where `submit` writes the matrix. The two client mixins are green on the compiler and traced against the
