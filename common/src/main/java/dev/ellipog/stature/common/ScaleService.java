@@ -7,11 +7,11 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
-import net.minecraft.core.Holder;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 
 /**
  * Sizing an entity: the uniform scale, the box's shape, and the attributes that travel with them
@@ -67,26 +67,77 @@ public final class ScaleService {
     public static void apply(LivingEntity entity, ScaleState state) {
         float scale = state.scale();
 
-        write(entity, Attributes.SCALE, scale, false);
-        write(entity, Attributes.BLOCK_INTERACTION_RANGE, scale, true);
-        write(entity, Attributes.ENTITY_INTERACTION_RANGE, scale, true);
-        write(entity, Attributes.STEP_HEIGHT, scale, true);
+        // Only the uniform rides a base write. Reach, step and the rest of the attribute
+        // table belong to channels, whose modifiers compose onto the entity's own base:
+        // writing both counts twice (a scale-2 reach lands at 18 blocks instead of 9).
+        writeScale(entity, scale);
 
-        // The channel layer always has the last word on these three and the rest of the table:
-        // with no overrides set its word is exactly the backbone's, which the equality skip in
-        // the write turns into a no-op, so a frame-less world pays nothing for the table.
         ChannelService.applyAttributes(entity);
 
         StatureScale duck = (StatureScale) entity;
         boolean shapeChanged = !duck.stature$axes().equals(state.axes());
+        AABB oldBox = entity.getBoundingBox();
         duck.stature$setAxes(state.axes());
         entity.refreshDimensions();
+
+        if (!entity.level().isClientSide()) {
+            displace(entity, oldBox);
+        }
 
         if (shapeChanged && !entity.level().isClientSide()) {
             // Only when the shape moved: a uniform ease changes the attribute twenty times and the
             // shape not at all, and vanilla already syncs that attribute every tick.
             StatureNetworking.broadcast(entity, state);
         }
+    }
+
+    /**
+     * Pushes a grown entity out of solid rock, or hurts it when there is nowhere to go.
+     *
+     * <p>Runs after every server-side size write, but only when the box grew: a smaller box
+     * cannot newly intersect anything. Escape tries up first, then out the sides; each
+     * candidate is the whole box moved, so the entity lands fully in air or not at all.
+     * Failure hurts a little, every time, because applies repeat during eases: a tap for an
+     * instant set, a real crushing for a full ease spent encased. Vanilla suffocation picks
+     * up whatever remains.
+     */
+    private static void displace(LivingEntity entity, AABB oldBox) {
+        AABB box = entity.getBoundingBox();
+        if (box.getSize() <= oldBox.getSize()) {
+            return;
+        }
+        Level level = entity.level();
+        if (!level.getBlockCollisions(entity, box).iterator().hasNext()) {
+            return;
+        }
+
+        double[] up = {1.0, 2.0, 3.0};
+        double[] out = {1.0, 2.0};
+        double[][] sides = {{1.0, 0.0}, {-1.0, 0.0}, {0.0, 1.0}, {0.0, -1.0}};
+        for (double dy : up) {
+            if (moveIfFree(entity, level, box, 0.0, dy, 0.0)) {
+                return;
+            }
+        }
+        for (double r : out) {
+            for (double[] side : sides) {
+                if (moveIfFree(entity, level, box, side[0] * r, 0.0, side[1] * r)) {
+                    return;
+                }
+            }
+        }
+        entity.hurtOrSimulate(level.damageSources().inWall(), 1.0F);
+    }
+
+    private static boolean moveIfFree(
+            LivingEntity entity, Level level, AABB box, double dx, double dy, double dz) {
+        AABB moved = box.move(dx, dy, dz);
+        if (level.getBlockCollisions(entity, moved).iterator().hasNext()) {
+            return false;
+        }
+        entity.teleportTo((moved.minX + moved.maxX) / 2.0, moved.minY, (moved.minZ + moved.maxZ) / 2.0);
+        entity.fallDistance = 0.0F;
+        return true;
     }
 
     /**
@@ -120,22 +171,20 @@ public final class ScaleService {
     }
 
     /**
-     * Writes one attribute, if this entity has it at all.
+     * Writes the uniform scale, if this entity has the attribute at all.
      *
-     * <p>Only the uniform scale is written here now: every other attribute belongs to a channel,
-     * whose multiplier modifiers compose onto the entity's own base instead of replacing it. Not
-     * every entity has every attribute, so a missing one is skipped rather than treated as an
-     * error.
+     * <p>Every other attribute belongs to a channel, whose multiplier modifiers compose onto
+     * the entity's own base instead of replacing it. A missing attribute is skipped rather
+     * than treated as an error.
      */
-    private static void write(LivingEntity entity, Holder<Attribute> attribute, float scale, boolean timesDefault) {
-        AttributeInstance instance = entity.getAttribute(attribute);
+    private static void writeScale(LivingEntity entity, float scale) {
+        AttributeInstance instance = entity.getAttribute(Attributes.SCALE);
         if (instance == null) {
             return;
         }
 
-        double value = timesDefault ? attribute.value().getDefaultValue() * scale : scale;
-        if (instance.getBaseValue() != value) {
-            instance.setBaseValue(value);
+        if (instance.getBaseValue() != scale) {
+            instance.setBaseValue(scale);
         }
     }
 }

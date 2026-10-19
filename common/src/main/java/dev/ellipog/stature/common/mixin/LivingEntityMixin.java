@@ -84,6 +84,9 @@ public abstract class LivingEntityMixin implements StatureScale {
     private Map<String, AxesTransition> stature$partTransitions;
 
     @Unique
+    private boolean stature$firstPersonVanilla;
+
+    @Unique
     private HitRegion stature$incomingRegion;
 
     @Unique
@@ -175,6 +178,16 @@ public abstract class LivingEntityMixin implements StatureScale {
             this.stature$partTransitions = new LinkedHashMap<>();
         }
         return this.stature$partTransitions;
+    }
+
+    @Override
+    public boolean stature$firstPersonVanilla() {
+        return this.stature$firstPersonVanilla;
+    }
+
+    @Override
+    public void stature$setFirstPersonVanilla(boolean vanilla) {
+        this.stature$firstPersonVanilla = vanilla;
     }
 
     @Override

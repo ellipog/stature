@@ -43,6 +43,18 @@ public abstract class ModelFeatureRendererMixin {
         return CURRENT.get();
     }
 
+    /** Hands a pre-resolved node map to the pose hook. First-person rendering only. */
+    @Unique
+    static void stature$setCurrent(Map<ModelPart, ScaleAxes> factors) {
+        CURRENT.set(factors);
+    }
+
+    /** Drops whatever a render handed over. First-person rendering only. */
+    @Unique
+    static void stature$clearCurrent() {
+        CURRENT.remove();
+    }
+
     @Inject(
             method = "prepareModel(Lnet/minecraft/client/renderer/feature/ModelFeatureRenderer$Submit;)V",
             at = @At("HEAD"))

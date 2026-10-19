@@ -59,6 +59,7 @@ public final class StatureFabricClient implements ClientModInitializer {
                         StatureScale duck = (StatureScale) living;
                         duck.stature$partFactors().clear();
                         duck.stature$partFactors().putAll(payload.parts());
+                        duck.stature$setFirstPersonVanilla(payload.firstPersonVanilla());
                     }
                 }));
         ClientPlayNetworking.registerGlobalReceiver(ConfigPayload.TYPE, (payload, context) ->

@@ -173,7 +173,20 @@ of them per entity. Below micro, walls climb like ladders and bars, fences and b
 small things through (panes stay walls). Above macro, leaves, panes and crops break on
 contact, low ceilings compress for 2.0 every second, and footsteps land louder and deeper.
 Knockback already followed the root law at every scale, so its flag only disables the
-follow. Measured: a 0.2 zombie fell through bars onto stone while a vanilla one landed on
+follow.
+
+## Beyond the envelope
+
+```cmd
+/stature set <targets> --dangerous <scale> [ticks] [easing]
+```
+
+The command clamps to what the attribute holds (0.0625 to 16.0). Past that, the box keeps
+the nearest bound and the model channel shows the rest: a 100x looks 100x with a 16x box
+rather than freezing physics, and the look stays until its channel is reset. Growing
+inside rock pops out to the nearest air instead, or takes compression when truly encased.
+Measured: a pocketed zombie landed on the roof at double height, and a 100x read 16x on
+the box with the model carrying the rest. Measured: a 0.2 zombie fell through bars onto stone while a vanilla one landed on
 top, a macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve
 seconds.
 

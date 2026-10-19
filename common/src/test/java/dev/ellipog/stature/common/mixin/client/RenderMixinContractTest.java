@@ -115,4 +115,17 @@ class RenderMixinContractTest {
                 "translateAndRotate", PoseStack.class);
         assertEquals(void.class, method.getReturnType());
     }
+
+    @Test
+    void firstPersonHandsSubmitArmNodesDirectly() throws Exception {
+        var method = net.minecraft.client.renderer.entity.player.AvatarRenderer.class.getDeclaredMethod(
+                "renderHand",
+                PoseStack.class,
+                SubmitNodeCollector.class,
+                int.class,
+                net.minecraft.resources.Identifier.class,
+                net.minecraft.client.model.geom.ModelPart.class,
+                boolean.class);
+        assertEquals(void.class, method.getReturnType());
+    }
 }

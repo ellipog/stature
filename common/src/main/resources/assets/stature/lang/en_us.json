@@ -1,5 +1,6 @@
 {
     "stature.command.set.success": "Set %s to %sx",
+    "stature.command.set.dangerous": "Set %s to %sx past the envelope: box holds %sx, model shows the rest",
     "stature.command.size.success": "Shaped %s to %s x %s x %s",
     "stature.command.set.none": "No living entities matched",
     "stature.command.get": "%s is at %sx (box %s)",

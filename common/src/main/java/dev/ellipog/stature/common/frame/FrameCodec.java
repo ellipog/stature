@@ -57,7 +57,8 @@ public final class FrameCodec {
     /** Fields this build understands. Anything else is reported once per file. */
     private static final Set<String> KNOWN = Set.of(
             "size", "scale", "eye_height", "easing", "entities", "entity_tags",
-            "rig", "parts", "hitbox_from_parts", "regions", "thresholds", "comment", "$schema");
+            "rig", "parts", "hitbox_from_parts", "regions", "thresholds",
+            "first_person_arms", "comment", "$schema");
 
     /** Conventionally a schema pointer or prose, and never a frame's business. */
     private static final Set<String> IGNORED_SILENTLY = Set.of("comment", "$schema");
@@ -98,6 +99,7 @@ public final class FrameCodec {
         boolean hitboxFromParts = optionalFlag(source, json, "hitbox_from_parts");
         List<FrameRegion> regions = regions(source, json);
         Thresholds thresholds = thresholds(source, json);
+        Boolean firstPersonArms = optionalFlagBoxed(source, json, "first_person_arms");
 
         StringBuilder unknown = new StringBuilder();
         for (String key : json.keySet()) {
@@ -114,7 +116,7 @@ public final class FrameCodec {
         try {
             return new FrameFile(id, new FrameSpec(scale, size[0], size[1], size[2], eyeHeight, easing),
                     entities, tags, rig, parts, hitboxFromParts, regions,
-                    thresholds.micro(), thresholds.macro(), thresholds.flags());
+                    thresholds.micro(), thresholds.macro(), thresholds.flags(), firstPersonArms);
         } catch (IllegalArgumentException e) {
             throw new FrameFormatException(source + ": " + e.getMessage(), e);
         }
@@ -251,9 +253,16 @@ public final class FrameCodec {
     /** A flag, off when absent. */
     private static boolean optionalFlag(String source, JsonObject json, String field)
             throws FrameFormatException {
+        Boolean value = optionalFlagBoxed(source, json, field);
+        return value != null && value;
+    }
+
+    /** A flag, null when absent so callers can tell unset from false. */
+    private static Boolean optionalFlagBoxed(String source, JsonObject json, String field)
+            throws FrameFormatException {
         JsonElement element = json.get(field);
         if (element == null || element.isJsonNull()) {
-            return false;
+            return null;
         }
         if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isBoolean()) {
             throw new FrameFormatException(source + ": \"" + field + "\" must be true or false, got " + kindOf(element));

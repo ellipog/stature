@@ -46,4 +46,23 @@ class FrameCodecThresholdsTest {
         assertThrows(FrameFormatException.class,
                 () -> parse("{\"size\": [1.0, 1.0], \"thresholds\": {\"trampling\": \"sometimes\"}}"));
     }
+
+    @Test
+    void firstPersonArmsDefaultsToUnset() throws Exception {
+        assertNull(parse("{\"size\": [1.0, 1.0]}").firstPersonArms());
+    }
+
+    @Test
+    void firstPersonArmsParses() throws Exception {
+        assertEquals(Boolean.FALSE,
+                parse("{\"size\": [1.0, 1.0], \"first_person_arms\": false}").firstPersonArms());
+        assertEquals(Boolean.TRUE,
+                parse("{\"size\": [1.0, 1.0], \"first_person_arms\": true}").firstPersonArms());
+    }
+
+    @Test
+    void nonBooleanFirstPersonArmsFailsTheFile() {
+        assertThrows(FrameFormatException.class,
+                () -> parse("{\"size\": [1.0, 1.0], \"first_person_arms\": \"sometimes\"}"));
+    }
 }

@@ -112,6 +112,14 @@ public interface StatureScale {
     Map<String, AxesTransition> stature$partTransitions();
 
     /**
+     * Whether this entity's first-person hands stay vanilla. Set from the frame, synced
+     * with the parts; the render hook reads it off the local player.
+     */
+    boolean stature$firstPersonVanilla();
+
+    void stature$setFirstPersonVanilla(boolean vanilla);
+
+    /**
      * A hit region waiting for damage application, or null. Producers stash it with the current
      * tick; the damage hook consumes it in the same tick and records it as the last hit.
      */

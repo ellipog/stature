@@ -82,13 +82,15 @@ public final class StatureNetworking {
 
     public static void broadcastParts(LivingEntity entity, Map<String, ScaleAxes> parts) {
         if (installed != null) {
-            installed.broadcast(entity, new PartsPayload(entity.getId(), parts));
+            installed.broadcast(entity, new PartsPayload(entity.getId(), parts,
+                    ((StatureScale) entity).stature$firstPersonVanilla()));
         }
     }
 
     public static void sendPartsTo(ServerPlayer player, LivingEntity entity, Map<String, ScaleAxes> parts) {
         if (installed != null) {
-            installed.sendTo(player, new PartsPayload(entity.getId(), parts));
+            installed.sendTo(player, new PartsPayload(entity.getId(), parts,
+                    ((StatureScale) entity).stature$firstPersonVanilla()));
         }
     }
 

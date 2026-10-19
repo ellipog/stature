@@ -103,6 +103,7 @@ public final class FrameService {
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.NONE);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$setFirstPersonVanilla(false);
         duck.stature$partFactors().clear();
         duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
@@ -167,6 +168,7 @@ public final class FrameService {
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.MANUAL);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$setFirstPersonVanilla(false);
         duck.stature$partFactors().clear();
         duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
@@ -252,6 +254,7 @@ public final class FrameService {
         duck.stature$setFrame(frameId);
         duck.stature$setFrameSource(source);
         duck.stature$setEyeHeight(frame.hasEyeHeight() ? frame.eyeHeight() : StatureScale.NO_EYE_HEIGHT);
+        duck.stature$setFirstPersonVanilla(file.firstPersonArms() != null && file.firstPersonArms());
         duck.stature$partFactors().clear();
         duck.stature$partFactors().putAll(parts);
         duck.stature$partTransitions().clear();
@@ -342,6 +345,7 @@ public final class FrameService {
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.DEFAULT);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$setFirstPersonVanilla(false);
         duck.stature$partFactors().clear();
         duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);

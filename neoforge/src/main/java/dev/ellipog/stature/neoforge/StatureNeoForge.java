@@ -72,6 +72,7 @@ public final class StatureNeoForge {
                                 StatureScale duck = (StatureScale) living;
                                 duck.stature$partFactors().clear();
                                 duck.stature$partFactors().putAll(payload.parts());
+                                duck.stature$setFirstPersonVanilla(payload.firstPersonVanilla());
                             }
                         })).playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC,
                         (payload, context) -> context.enqueueWork(() -> StatureConfig.applySynced(

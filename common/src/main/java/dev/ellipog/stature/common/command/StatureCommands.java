@@ -109,21 +109,40 @@ public final class StatureCommands {
     }
 
     private static void setBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
-        RequiredArgumentBuilder<CommandSourceStack, Double> scale =
-                Commands.argument("scale", DoubleArgumentType.doubleArg(ScaleLimits.MIN, ScaleLimits.MAX))
-                        // No ticks means now, and "now" is linear because there is no curve to walk:
-                        // the eased default only means something once a duration exists.
-                        .executes(context -> set(context, 0, Easing.LINEAR));
+        RequiredArgumentBuilder<CommandSourceStack, ?> targets =
+                Commands.argument("targets", EntityArgument.entities());
+        targets.then(scaleChain(false));
+        targets.then(Commands.literal("--dangerous").then(scaleChain(true)));
 
-        scale.then(Commands.argument("ticks", IntegerArgumentType.integer(0, MAX_TICKS))
-                .executes(context -> set(
-                        context, IntegerArgumentType.getInteger(context, "ticks"), Easing.EASE_OUT_CUBIC))
-                .then(easing("linear", Easing.LINEAR))
-                .then(easing("cubic", Easing.EASE_OUT_CUBIC))
-                .then(easing("elastic", Easing.ELASTIC)));
+        root.then(Commands.literal("set").then(targets));
+    }
 
-        root.then(Commands.literal("set")
-                .then(Commands.argument("targets", EntityArgument.entities()).then(scale)));
+    /**
+     * The scale chain, twice: once inside the attribute envelope, once outside it. Beyond
+     * the envelope the attribute holds its nearest bound and the model channel shows the
+     * rest, so a 100x looks 100x with a 16x box rather than freezing physics.
+     */
+    private static RequiredArgumentBuilder<CommandSourceStack, Double> scaleChain(boolean dangerous) {
+        RequiredArgumentBuilder<CommandSourceStack, Double> scale = Commands.argument("scale",
+                        dangerous ? DoubleArgumentType.doubleArg(0.0001, 10000.0)
+                                : DoubleArgumentType.doubleArg(ScaleLimits.MIN, ScaleLimits.MAX))
+                // No ticks means now, and "now" is linear because there is no curve to walk:
+                // the eased default only means something once a duration exists.
+                .executes(context -> dangerous ? setDangerous(context, 0, Easing.LINEAR)
+                        : set(context, 0, Easing.LINEAR));
+
+        RequiredArgumentBuilder<CommandSourceStack, Integer> ticks =
+                Commands.argument("ticks", IntegerArgumentType.integer(0, MAX_TICKS))
+                        .executes(context -> dangerous
+                                ? setDangerous(context, IntegerArgumentType.getInteger(context, "ticks"),
+                                        Easing.EASE_OUT_CUBIC)
+                                : set(context, IntegerArgumentType.getInteger(context, "ticks"),
+                                        Easing.EASE_OUT_CUBIC));
+        ticks.then(easing("linear", Easing.LINEAR, dangerous));
+        ticks.then(easing("cubic", Easing.EASE_OUT_CUBIC, dangerous));
+        ticks.then(easing("elastic", Easing.ELASTIC, dangerous));
+        scale.then(ticks);
+        return scale;
     }
 
     private static void sizeBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
@@ -233,9 +252,11 @@ public final class StatureCommands {
      * of curves, so tab-completion offers them, a typo is refused by Brigadier with the alternatives,
      * and adding a curve to {@link Easing} without adding it here is visible rather than silent.
      */
-    private static LiteralArgumentBuilder<CommandSourceStack> easing(String name, Easing easing) {
+    private static LiteralArgumentBuilder<CommandSourceStack> easing(String name, Easing easing, boolean dangerous) {
         return Commands.literal(name)
-                .executes(context -> set(context, IntegerArgumentType.getInteger(context, "ticks"), easing));
+                .executes(context -> dangerous
+                        ? setDangerous(context, IntegerArgumentType.getInteger(context, "ticks"), easing)
+                        : set(context, IntegerArgumentType.getInteger(context, "ticks"), easing));
     }
 
     private static int set(CommandContext<CommandSourceStack> context, int ticks, Easing easing)
@@ -251,6 +272,31 @@ public final class StatureCommands {
             context.getSource().sendSuccess(
                     () -> Component.translatable(
                             "stature.command.set.success", living.getDisplayName(), number(scale)),
+                    true);
+        }
+        return report(context, changed);
+    }
+
+    /**
+     * Sets past the envelope: the attribute holds its nearest bound and the model channel
+     * shows the rest. The override stays until reset, so a later plain set keeps the look
+     * until {@code channel ... model reset} clears it.
+     */
+    private static int setDangerous(CommandContext<CommandSourceStack> context, int ticks, Easing easing)
+            throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+        float scale = (float) DoubleArgumentType.getDouble(context, "scale");
+        float clamped = ScaleLimits.clamp(scale);
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            FrameService.setManualScale(living, clamped, ticks, easing);
+            ChannelService.setChannel(living, ChannelService.MODEL, scale, ticks, easing);
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.set.dangerous",
+                            living.getDisplayName(), number(scale), number(clamped)),
                     true);
         }
         return report(context, changed);

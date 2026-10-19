@@ -12,13 +12,15 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * One entity's part factors, on the wire: its id plus path to triple.
+ * One entity's part factors, on the wire: its id, path to triple, and whether first-person
+ * hands stay vanilla for it.
  *
  * <p>Same rules as the channel map: only what is set travels, the receiver replaces whole, and
  * the entry count is capped against corrupt packets. Paths are already resolved server-side, so
  * the client walks them without knowing any rig.
  */
-public record PartsPayload(int entityId, Map<String, ScaleAxes> parts) implements CustomPacketPayload {
+public record PartsPayload(int entityId, Map<String, ScaleAxes> parts, boolean firstPersonVanilla)
+        implements CustomPacketPayload {
 
     static final int MAX_ENTRIES = 32;
 
@@ -28,6 +30,7 @@ public record PartsPayload(int entityId, Map<String, ScaleAxes> parts) implement
     public static final StreamCodec<RegistryFriendlyByteBuf, PartsPayload> STREAM_CODEC = StreamCodec.of(
             (buffer, payload) -> {
                 buffer.writeVarInt(payload.entityId);
+                buffer.writeBoolean(payload.firstPersonVanilla);
                 buffer.writeVarInt(payload.parts.size());
                 for (Map.Entry<String, ScaleAxes> entry : payload.parts.entrySet()) {
                     buffer.writeUtf(entry.getKey());
@@ -38,6 +41,7 @@ public record PartsPayload(int entityId, Map<String, ScaleAxes> parts) implement
             },
             buffer -> {
                 int entityId = buffer.readVarInt();
+                boolean firstPersonVanilla = buffer.readBoolean();
                 int count = buffer.readVarInt();
                 if (count < 0 || count > MAX_ENTRIES) {
                     throw new IllegalArgumentException(
@@ -52,7 +56,7 @@ public record PartsPayload(int entityId, Map<String, ScaleAxes> parts) implement
                         throw new IllegalArgumentException("parts packet carries no size for " + path);
                     }
                 }
-                return new PartsPayload(entityId, Map.copyOf(parts));
+                return new PartsPayload(entityId, Map.copyOf(parts), firstPersonVanilla);
             });
 
     @Override

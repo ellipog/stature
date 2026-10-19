@@ -1,6 +1,7 @@
 package dev.ellipog.stature.common.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,17 +27,19 @@ class PartsPayloadTest {
     @Test
     void factorsSurviveTheWire() {
         PartsPayload decoded = roundTrip(new PartsPayload(5,
-                Map.of("head", new ScaleAxes(2.0F, 2.0F, 2.0F), "", ScaleAxes.UNIFORM)));
+                Map.of("head", new ScaleAxes(2.0F, 2.0F, 2.0F), "", ScaleAxes.UNIFORM), true));
         assertEquals(5, decoded.entityId());
         assertEquals(
                 Map.of("head", new ScaleAxes(2.0F, 2.0F, 2.0F), "", ScaleAxes.UNIFORM),
                 decoded.parts());
+        assertTrue(decoded.firstPersonVanilla());
     }
 
     @Test
     void anEmptyMapSurvivesTheWire() {
-        PartsPayload decoded = roundTrip(new PartsPayload(5, Map.of()));
+        PartsPayload decoded = roundTrip(new PartsPayload(5, Map.of(), false));
         assertTrue(decoded.parts().isEmpty());
+        assertFalse(decoded.firstPersonVanilla());
     }
 
     @Test
@@ -44,6 +47,7 @@ class PartsPayloadTest {
         RegistryFriendlyByteBuf buffer =
                 new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY);
         buffer.writeVarInt(5);
+        buffer.writeBoolean(false);
         buffer.writeVarInt(PartsPayload.MAX_ENTRIES + 1);
         assertThrows(IllegalArgumentException.class, () -> PartsPayload.STREAM_CODEC.decode(buffer));
     }
@@ -53,6 +57,7 @@ class PartsPayloadTest {
         RegistryFriendlyByteBuf buffer =
                 new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY);
         buffer.writeVarInt(5);
+        buffer.writeBoolean(false);
         buffer.writeVarInt(1);
         buffer.writeUtf("head");
         buffer.writeFloat(Float.NaN);

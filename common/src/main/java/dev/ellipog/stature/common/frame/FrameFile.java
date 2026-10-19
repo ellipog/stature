@@ -30,7 +30,8 @@ public record FrameFile(
         List<FrameRegion> regions,
         Float thresholdMicro,
         Float thresholdMacro,
-        Map<String, Boolean> thresholdFlags) {
+        Map<String, Boolean> thresholdFlags,
+        Boolean firstPersonArms) {
 
     public FrameFile {
         entities = List.copyOf(entities);
