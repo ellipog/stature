@@ -4,6 +4,7 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
 
@@ -47,6 +48,12 @@ public abstract class ServerPlayerMixin {
         // frame on first tick, which re-applies its parts. Transitions never travel.
         duck.stature$partFactors().clear();
         duck.stature$partFactors().putAll(oldDuck.stature$partFactors());
+        // Channel overrides travel the same way, and their attribute effects re-derive at
+        // once: without this the map would arrive (through the sync below) with vanilla
+        // numbers underneath it.
+        duck.stature$channelOverrides().clear();
+        duck.stature$channelOverrides().putAll(oldDuck.stature$channelOverrides());
+        ChannelService.applyAttributes(self);
         // Instant and linear: this is a restoration, not a change, so there is nothing to ease.
         // The apply broadcasts, which unknown-id receivers drop and tracking then repeats.
         ScaleService.setSize(self, oldState, 0, Easing.LINEAR);

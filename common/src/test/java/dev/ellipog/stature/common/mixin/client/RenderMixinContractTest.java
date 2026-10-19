@@ -128,4 +128,13 @@ class RenderMixinContractTest {
                 boolean.class);
         assertEquals(void.class, method.getReturnType());
     }
+
+    @Test
+    void shakingRidesTheWalkBobPass() throws Exception {
+        var method = net.minecraft.client.renderer.GameRenderer.class.getDeclaredMethod(
+                "bobView",
+                CameraRenderState.class,
+                PoseStack.class);
+        assertEquals(void.class, method.getReturnType());
+    }
 }

@@ -2,6 +2,7 @@ package dev.ellipog.stature.common.net;
 
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
+import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 
 import java.util.Map;
@@ -45,6 +46,9 @@ public final class StatureNetworking {
 
         /** One player, for the threshold tiers and flags. */
         void sendTo(ServerPlayer player, ConfigPayload payload);
+
+        /** Everyone who could see this entity, for one macro footstep. */
+        void broadcast(LivingEntity entity, FootstepPayload payload);
     }
 
     private static Network installed;
@@ -97,6 +101,13 @@ public final class StatureNetworking {
     public static void sendConfigTo(ServerPlayer player, float micro, float macro, Map<String, Boolean> flags) {
         if (installed != null) {
             installed.sendTo(player, new ConfigPayload(micro, macro, flags));
+        }
+    }
+
+    public static void broadcastFootstep(LivingEntity entity) {
+        if (installed != null) {
+            installed.broadcast(entity, new FootstepPayload(
+                    entity.getX(), entity.getY(), entity.getZ(), ScaleService.stateOf(entity).scale()));
         }
     }
 

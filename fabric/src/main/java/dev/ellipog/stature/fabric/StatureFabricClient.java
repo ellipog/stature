@@ -5,7 +5,11 @@ import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
+import dev.ellipog.stature.common.client.CameraTrauma;
+import dev.ellipog.stature.common.client.ClientViews;
 import dev.ellipog.stature.common.net.ConfigPayload;
+import dev.ellipog.stature.common.net.FootstepPayload;
+import dev.ellipog.stature.common.net.HandshakePayload;
 import dev.ellipog.stature.common.net.PartsPayload;
 
 import net.fabricmc.api.ClientModInitializer;
@@ -13,6 +17,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The client receiver, in a client entry point so a dedicated server never loads it.
@@ -65,5 +70,14 @@ public final class StatureFabricClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(ConfigPayload.TYPE, (payload, context) ->
                 context.client().execute(() -> StatureConfig.applySynced(
                         payload.micro(), payload.macro(), payload.flags())));
+        ClientPlayNetworking.registerGlobalReceiver(FootstepPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> {
+                    Vec3 camera = ClientViews.cameraPosition();
+                    if (camera != null) {
+                        CameraTrauma.addShake(payload.x(), payload.y(), payload.z(), payload.scale(), camera);
+                    }
+                }));
+        ClientPlayNetworking.registerGlobalReceiver(HandshakePayload.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientPlayNetworking.send(new HandshakePayload())));
     }
 }

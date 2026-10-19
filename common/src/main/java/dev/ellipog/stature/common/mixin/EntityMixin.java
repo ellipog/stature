@@ -106,6 +106,9 @@ public abstract class EntityMixin {
                     soundType.getVolume() * Thresholds.stepVolume(living, 0.15F),
                     soundType.getPitch() * Thresholds.stepPitch(living, 1.0F));
             info.cancel();
+            if (!living.level().isClientSide()) {
+                StatureNetworking.broadcastFootstep(living);
+            }
         }
     }
 
@@ -242,12 +245,12 @@ public abstract class EntityMixin {
         // A load restores the server's truth, but nobody tells the clients: broadcasts only fire
         // on change, and StartTracking never fires for your own player entity. Flag players for
         // the tick-hook re-send, and broadcast now for the mob case, where tracking picks it up.
-        // Each half travels only when it has something to say: a channels-only entity sends no
-        // box packet, and a box-only entity sends no channel packet.
+        // Each third travels only when it has something to say: a parts-only entity sends no
+        // box packet and no channel packet.
         boolean custom = frame != null || eyeHeight != StatureScale.NO_EYE_HEIGHT
                 || width != 1.0F || height != 1.0F || depth != 1.0F;
         if (!self.level().isClientSide() && scaled instanceof LivingEntity living) {
-            if (scaled instanceof ServerPlayer && (custom || channels)) {
+            if (scaled instanceof ServerPlayer && (custom || channels || parts)) {
                 scaled.stature$setNeedsSync(true);
             }
             if (custom) {
@@ -255,6 +258,9 @@ public abstract class EntityMixin {
             }
             if (channels) {
                 StatureNetworking.broadcast(living, ChannelService.syncMap(living));
+            }
+            if (parts) {
+                StatureNetworking.broadcastParts(living, PartService.syncMap(living));
             }
         }
     }

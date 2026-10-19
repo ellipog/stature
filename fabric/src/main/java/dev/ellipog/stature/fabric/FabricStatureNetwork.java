@@ -3,6 +3,7 @@ package dev.ellipog.stature.fabric;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
 import dev.ellipog.stature.common.net.ConfigPayload;
+import dev.ellipog.stature.common.net.FootstepPayload;
 import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
@@ -66,5 +67,14 @@ final class FabricStatureNetwork implements StatureNetworking.Network {
     @Override
     public void sendTo(ServerPlayer player, ConfigPayload payload) {
         ServerPlayNetworking.send(player, payload);
+    }
+
+    @Override
+    public void broadcast(LivingEntity entity, FootstepPayload payload) {
+        if (entity.level() instanceof ServerLevel level) {
+            for (ServerPlayer player : level.players()) {
+                ServerPlayNetworking.send(player, payload);
+            }
+        }
     }
 }

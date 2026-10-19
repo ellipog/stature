@@ -3,6 +3,8 @@ package dev.ellipog.stature.neoforge;
 import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.client.CameraTrauma;
+import dev.ellipog.stature.common.client.ClientViews;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -12,12 +14,14 @@ import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
 import dev.ellipog.stature.common.net.ConfigPayload;
+import dev.ellipog.stature.common.net.FootstepPayload;
 import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -76,7 +80,15 @@ public final class StatureNeoForge {
                             }
                         })).playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC,
                         (payload, context) -> context.enqueueWork(() -> StatureConfig.applySynced(
-                                payload.micro(), payload.macro(), payload.flags()))));
+                                payload.micro(), payload.macro(), payload.flags())))
+                        .playToClient(FootstepPayload.TYPE, FootstepPayload.STREAM_CODEC,
+                        (payload, context) -> context.enqueueWork(() -> {
+                            Vec3 camera = ClientViews.cameraPosition();
+                            if (camera != null) {
+                                CameraTrauma.addShake(
+                                        payload.x(), payload.y(), payload.z(), payload.scale(), camera);
+                            }
+                        })));
 
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) ->
                 StatureCommands.register(event.getDispatcher()));

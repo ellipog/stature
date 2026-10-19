@@ -17,6 +17,7 @@
     "client": [
         "client.AvatarRendererMixin",
         "client.EntityRenderDispatcherMixin",
+        "client.GameRendererMixin",
         "client.ItemInHandLayerMixin",
         "client.LivingEntityRendererMixin",
         "client.LivingEntityRenderStateMixin",

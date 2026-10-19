@@ -173,7 +173,9 @@ of them per entity. Below micro, walls climb like ladders and bars, fences and b
 small things through (panes stay walls). Above macro, leaves, panes and crops break on
 contact, low ceilings compress for 2.0 every second, and footsteps land louder and deeper.
 Knockback already followed the root law at every scale, so its flag only disables the
-follow.
+follow. Measured: a 0.2 zombie fell through bars onto stone while a vanilla one landed on
+top, a macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve
+seconds.
 
 ## Beyond the envelope
 
@@ -186,9 +188,14 @@ the nearest bound and the model channel shows the rest: a 100x looks 100x with a
 rather than freezing physics, and the look stays until its channel is reset. Growing
 inside rock pops out to the nearest air instead, or takes compression when truly encased.
 Measured: a pocketed zombie landed on the roof at double height, and a 100x read 16x on
-the box with the model carrying the rest. Measured: a 0.2 zombie fell through bars onto stone while a vanilla one landed on
-top, a macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve
-seconds.
+the box with the model carrying the rest.
+
+## Peers
+
+A Fabric client without the mod is asked on join and refused after ten silent seconds;
+a NeoForge client is refused by the platform's own mod list first. Either way nobody
+renders or collides against wrong sizes. Macro footsteps shake nearby cameras with
+distance falloff, riding the walk-bob toggle so comfort settings govern it too.
 
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied
@@ -203,14 +210,12 @@ the box.
 
 ## What is next
 
-- **The rest of a frame's fields.** `size`, `scale`, `eye_height`, `easing`, `entities` and
-  `entity_tags` are read today; `channels` (§14.9), `parts` (§14.7), `regions` (§14.7) and `thresholds`
-  (§14.3) are ignored with a note until the subsystems they name exist. Mods that size other mods'
-  entities get their own precedence level through `FrameService.setIntegrationFrame`: below an
-  operator's choice, above every pack declaration, re-asserted by the owner rather than
-  re-evaluated, and named for what it is rather than for any one consumer.
-- **The per-axis render half** needs a client run to be believed.
-- **§14.9 channels** and **§14.7 per-part**, after that.
+- **Client trials.** Everything above is measured except what needs eyes: the per-axis
+  drawing, knockback feel, climbing, footstep shake, melee regions, first-person arms,
+  and joining without the mod on both loaders. The checklist lives in the chat that
+  shipped this.
+- **Voice output.** `voice_pitch` resolves today and drives nothing until a voice mod
+  reads it.
 
 `plan.md` is the plan (a local working document, deliberately not committed). `spike-s2/` is the
 throwaway that answered whether per-axis scaling is possible at all: it is, in two halves.
