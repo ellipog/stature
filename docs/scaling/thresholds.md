@@ -74,7 +74,7 @@ The server creates the file with its defaults on first start. It is re-read by
 | `trample_drops` | true | Whether trampled blocks drop their items |
 | `seismic_footsteps` | true | Louder, deeper steps and camera shake for macro entities |
 | `doorway_collision` | true | Compression damage for a macro entity whose head is inside a full block |
-| `projectile_scale` | true | Projectiles fired by a scaled entity inherit its size, hitbox, damage and launch speed |
+| `projectile_scale` | true | Projectiles fired by a scaled entity inherit its size, hitbox, drawn model, damage and launch speed |
 | `item_pickup_range` | true | Items and experience orbs are picked up from the scaled reach |
 | `riding_offset` | true | A mount's passenger attachment follows the riding offset channel |
 | `explosion_scale` | true | Explosions with a living cause use the scaled radius |

@@ -21,7 +21,7 @@ world. The last-verified column stays blank until a person has run the row.
 .\gradlew.bat :api:test :common:test
 ```
 
-The game-free suite is 224 tests: 43 in `:api` and 181 in `:common`, including the docs coverage
+The game-free suite is 236 tests: 43 in `:api` and 193 in `:common`, including the docs coverage
 test. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server gametests
 because Loom wires `check` to `runGameTest`.
 
@@ -120,7 +120,12 @@ This starts a real client, so it needs a logged-in session locally and a virtual
 (`xvfb-run`) on headless CI. It is not part of `build` and is not run by the headless server
 checks. Screenshots land under `fabric/build/run/clientGameTest/screenshots/`.
 `StatureFabricClientGameTests` currently grows the joined player to 16x, opens the inventory and
-takes `inventory_16x`; comparing it against a baseline waits for an approved screenshot.
+takes `inventory_16x`; comparing it against a baseline waits for an approved screenshot. It then
+fires an arrow from the 16x player (the config clamps the inherited factor to 4) and spawns an
+ownerless arrow carrying a hand-set 3x factor. Both are checked on the client entity, so the first
+covers the normal player-shot path and the second proves the dedicated projectile-scale packet
+works when the client has no owner to derive from. It also saves and reopens a shaped 16x player,
+which covers the connection-at-load regression.
 
 The manual screenshots for the scenarios below use the same shape: one F2 screenshot per row,
 named `<loader>-<ID>.png` (for example `fabric-R1.png`). Keep them outside git or attach them to a

@@ -124,6 +124,16 @@ Stature has not been released yet. This section covers everything on `master` so
 - Growing into solid rock searches outward for air and hurts at most once per transition instead
   of once per eased tick.
 - A malformed config packet is rejected whole, so the client cannot apply half a threshold set.
+- A scaled projectile's model now grows with its hitbox. The client render dispatcher scales every
+  non-living entity that carries a projectile factor, covering arrows, tridents, thrown items,
+  fireballs, wind charges and modded projectiles without a renderer mixin each. The pivot is the
+  projectile's render origin, so the model stays on the box's centre line and a stuck arrow keeps
+  its head in the block.
+- A projectile's inherited factor now travels to viewers with its own packet, sent when the owner
+  is learned and again when a player starts tracking the projectile. The client no longer draws a
+  vanilla-size model when its copy of the owner is missing, late or out of date.
+- The client no longer multiplies a projectile's already-scaled spawn velocity a second time. Size
+  is derived on both sides; launch speed is applied once, on the server.
 - The client starts with the part-pose mixin applied. Its shared helpers live in `PartPoseScope`
   instead of as non-private static methods on a mixin, which Mixin refuses. Found by running the
   Fabric client gametest.

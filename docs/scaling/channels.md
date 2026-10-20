@@ -100,11 +100,24 @@ hook covers arrows, tridents, fireballs, potions, snowballs, llama spit and modd
 The snapshot means a deflected projectile keeps the size and speed it was fired with.
 
 - The hitbox grows uniformly with the factor.
+- The drawn model grows by the same factor. One client hook at the entity render dispatcher covers
+  arrows, spectral arrows, tridents, thrown items such as snowballs, eggs and potions, fireballs,
+  wind charges, llama spit, shulker bullets and modded projectiles, so their renderers cannot
+  disagree with their boxes.
+- The model is scaled around the projectile's render origin, the point the box grows from. It stays
+  on the box's centre line, and an arrow stuck in a block keeps its head at the same depth.
 - Damage grows linearly: `1 + (factor - 1) * projectile_damage_strength`.
 - Launch speed grows by `factor ^ projectile_speed_strength`; the default exponent 0.5 makes a
   4x arrow fly twice as fast.
-- The factor is saved with the projectile, so an unloaded chunk does not shrink it.
+- The factor is saved with the projectile, so an unloaded chunk does not shrink it. It is also sent
+  to viewers when the projectile learns its owner and when a player starts tracking it, so a client
+  whose copy of the owner is missing or stale still draws the server's size.
 - Explosion damage is not multiplied by this channel; the explosion channel owns that radius.
+
+The `projectile_scale` switch gates the whole feature: hitbox, model, damage and speed. There is no
+separate render switch because the model and the box are meant to be one size; a visual-only switch
+would recreate the mismatch this channel exists to avoid. Turning `projectile_scale` off leaves
+newly fired projectiles exactly vanilla.
 
 ### Pickup reach
 
