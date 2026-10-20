@@ -21,7 +21,7 @@ world. The last-verified column stays blank until a person has run the row.
 .\gradlew.bat :api:test :common:test
 ```
 
-The game-free suite is 236 tests: 43 in `:api` and 193 in `:common`, including the docs coverage
+The game-free suite is 250 tests: 43 in `:api` and 207 in `:common`, including the docs coverage
 test. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server gametests
 because Loom wires `check` to `runGameTest`.
 
@@ -153,7 +153,7 @@ last column only after a person has run the row, and name the date, the loader a
 | R13 | framed micro player (micro override) against stone, iron bars, bamboo on a **dedicated** server | climbs and passes, no rubber-banding (M2) | |
 | R14 | framed player: swim, crawl under a trapdoor, sleep in a **straw bed** (new in 26.3), sit on a **cushion** (new in 26.3) | camera inside the box; seated offset plausible | |
 | R15 | 16× player walking through a forest including Poplar leaves (26.3) | trample limited, no lag spike, claims respected | |
-| R16 | two clients, 16× footsteps at 10 / 50 / 200 blocks | audible and shaking near, nothing far; shake scales with the Screen Effect slider | |
+| R16 | two clients, 16× footsteps at 10 / 50 / 200 blocks | B feels a capped shake near and nothing far; B's shake scales with the Screen Effect slider; A's own camera wobbles only gently while walking | |
 | R17 | relog, die and respawn, change dimension with parts-only and framed states | everything persists as designed | |
 
 ## M5 manual checks
@@ -163,12 +163,13 @@ the same last-verified column.
 
 | ID | Setup | Look for | Last verified (date, loader, commit) |
 |---|---|---|---|
-| M5-1 | Two clients: A at 16×, B at 200 blocks. Walk A at 10, 40, 50 and 200 blocks from B | B hears and feels the steps at 10 and 40 (the shake reaches 48 blocks), hears but does not feel them at 50, and neither hears nor feels them at 200; the shake follows B's Screen Effect slider; B receives no footstep packet at 200 blocks | |
+| M5-1 | Two clients: A at 16×, B at 200 blocks. Walk A at 10, 40, 50 and 200 blocks from B | B hears and feels the steps at 10 and 40 (the shake reaches 48 blocks), hears but does not feel them at 50, and neither hears nor feels them at 200; B's shake follows the Screen Effect slider; B receives no footstep packet at 200 blocks | |
 | M5-2 | NeoForge dedicated server, 20 zombies at 16× walking for 60 s, then the same pen at 1× | average MSPT within ±5% of the 1× run (see the performance procedure) | |
 | M5-3 | Non-op player at 16× walking through leaves and crops inside spawn protection, then inside a claim | nothing breaks in the protected area; a claim mod's cancellation is respected; a non-op cannot trample | |
 | M5-4 | Grow 1× to 16× inside a 3-high tunnel, then inside a sealed pocket | the tunnel ends in open air with at most one compression hit and no death at full health; a truly encased giant takes compression once per second, and armour does not stop it | |
 | M5-5 | `/stature set @s --dangerous 100`, then `/stature set @s 1` | the first reports the box at 16× with the model at 100×; the second gives a vanilla-size model, not a leftover 100× channel | |
 | M5-6 | A vanilla client joins a Stature server: Fabric first, then NeoForge | Fabric refuses after about 10 s with "This server requires the Stature mod"; NeoForge refuses at login because its required channels are not registered. The server stays up and no wrong-size entity is drawn. A client with Stature still joins, and a handshake that cannot be sent logs a warning and lets the join through (fail-open) | |
+| M5-7 | Two clients: A at 16×, B standing 12 blocks away. Walk A continuously, then set `camera_shake_strength=0` and reload | B's shake is noticeable but capped and does not grow from 4× to 16×; A's own camera is much gentler than B's and stays gentle at 16×; the zero multiplier and `seismic_footsteps=false` both silence all shake, and `camera_shake_self_strength=0` silences only A's own camera | |
 
 ## Peers matrix
 

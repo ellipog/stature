@@ -29,6 +29,8 @@ The server creates the file with its defaults on first start. It is re-read by
   "trample_max_per_scan": 8,
   "trample_drops": true,
   "seismic_footsteps": true,
+  "camera_shake_strength": 1.0,
+  "camera_shake_self_strength": 0.35,
   "doorway_collision": true,
   "projectile_scale": true,
   "projectile_scale_strength": 1.0,
@@ -73,6 +75,8 @@ The server creates the file with its defaults on first start. It is re-read by
 | `trample_max_per_scan` | 8 | The most blocks one trample scan may destroy. A whole number of 1 or more |
 | `trample_drops` | true | Whether trampled blocks drop their items |
 | `seismic_footsteps` | true | Louder, deeper steps and camera shake for macro entities |
+| `camera_shake_strength` | 1.0 | Multiplier on all footstep camera shake, from 0 to 4. Zero turns shake off |
+| `camera_shake_self_strength` | 0.35 | Multiplier on the walker's own footstep shake, from 0 to 4. Zero turns self shake off |
 | `doorway_collision` | true | Compression damage for a macro entity whose head is inside a full block |
 | `projectile_scale` | true | Projectiles fired by a scaled entity inherit its size, hitbox, drawn model, damage and launch speed |
 | `item_pickup_range` | true | Items and experience orbs are picked up from the scaled reach |
@@ -247,9 +251,26 @@ A macro entity breaks fragile blocks underfoot:
 
 A macro entity's steps are louder and deeper. The step volume is `base * scale`, capped at 4.0,
 and the pitch is `base / sqrt(scale)`. A footstep packet goes to players within
-`clamp(16 * volume, 16, 64)` blocks, which follows vanilla's own 16-blocks-per-volume rule. The
-camera shake reaches at most 48 blocks, falls off with distance squared, and is multiplied by the
+`clamp(16 * volume, 16, 64)` blocks, which follows vanilla's own 16-blocks-per-volume rule.
+
+The camera shake reaches at most 48 blocks and falls off with distance squared. Its proximity
+multiplier is `min(scale / 2.5, 2.0)`, so 8x and 16x steps are equally strong. Nearby players
+accumulate at most 0.6 trauma from a giant's steps; the walker's own camera accumulates at most
+0.15. Before the config multipliers, the walker's step uses its own gentler curve,
+`0.18 * min(scale / 4, 1)`, which reaches its limit at the 4x giant preset and does not grow
+further. The renderer turns trauma into at most 3 degrees of roll and 2 degrees of pitch, so the
+capped amplitudes are 1.8 and 1.2 degrees for a nearby player and 0.45 and 0.3 degrees for the
+giant itself. The two sources report their maximum rather than their sum, so a walker's own steps
+never add on top of a nearby giant's.
+
+`camera_shake_strength` multiplies both strengths and both caps, and
+`camera_shake_self_strength` multiplies only the walker's own steps. Either can be set to 0, and
+`seismic_footsteps` still switches the whole feature off. The shake is also multiplied by the
 vanilla Screen Effect slider, so a player who has turned screen effects off feels nothing.
+
+The vanilla walk bob is not amplified by scale: its amount is `min(0.1, horizontal movement per
+tick)`, which is already at the 0.1 cap at normal walking speed. A giant's faster movement makes
+the bob repeat more often, but its amplitude and the `bobView` toggle behave as they do at 1x.
 
 ### Doorway compression
 

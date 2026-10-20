@@ -137,3 +137,8 @@ Stature has not been released yet. This section covers everything on `master` so
 - The client starts with the part-pose mixin applied. Its shared helpers live in `PartPoseScope`
   instead of as non-private static methods on a mixin, which Mixin refuses. Found by running the
   Fabric client gametest.
+- A giant's own camera no longer shakes at full strength on every footstep. Own steps use a
+  separate, much smaller curve and a 0.15 trauma cap, nearby steps are capped at 0.6, and the
+  proximity multiplier stops growing at 8x. The new `camera_shake_strength` (default 1.0) and
+  `camera_shake_self_strength` (default 0.35) keys multiply both channels; 0 turns either off.
+  The `seismic_footsteps` switch and the vanilla Screen Effect slider still apply.

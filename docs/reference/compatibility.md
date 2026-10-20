@@ -64,7 +64,9 @@ that. The following are untested, not known to be broken:
 | Other mods that replace living entity renderers | Untested |
 
 The camera shake from macro footsteps is multiplied by the vanilla Screen Effect slider, so a
-player who has turned screen effects off feels none. A shader pack that replaces the camera or
+player who has turned screen effects off feels none. The walker's own steps use a separate, much
+smaller cap than nearby players' steps; `camera_shake_strength` and `camera_shake_self_strength`
+tune both, and either set to 0 turns its channel off. A shader pack that replaces the camera or
 bob path may change how the remaining shake looks.
 
 ## Client and server
