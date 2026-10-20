@@ -122,8 +122,11 @@ public final class StatureConfig {
             Map.entry("item_pickup_range_min", 0.25F),
             Map.entry("item_pickup_range_max", 4.0F),
             Map.entry("riding_offset_strength", 1.0F),
-            Map.entry("riding_offset_min", 0.25F),
-            Map.entry("riding_offset_max", 4.0F),
+            // The whole scale envelope, so the default factor is exactly the animal's own scale
+            // and the seat is untouched. This channel is a mount's attachment height, not a
+            // safety-bounded effect, so clamping the default would make a 16x mount seat low.
+            Map.entry("riding_offset_min", 0.0625F),
+            Map.entry("riding_offset_max", 16.0F),
             Map.entry("explosion_scale_strength", 1.0F),
             Map.entry("explosion_scale_min", 0.25F),
             Map.entry("explosion_scale_max", 3.0F),
@@ -691,8 +694,8 @@ public final class StatureConfig {
                           "item_pickup_range_max": 4.0,
                           "riding_offset": true,
                           "riding_offset_strength": 1.0,
-                          "riding_offset_min": 0.25,
-                          "riding_offset_max": 4.0,
+                          "riding_offset_min": 0.0625,
+                          "riding_offset_max": 16.0,
                           "explosion_scale": true,
                           "explosion_scale_strength": 1.0,
                           "explosion_scale_min": 0.25,

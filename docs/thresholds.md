@@ -42,8 +42,8 @@ The server creates the file with its defaults on first start. It is re-read by
   "item_pickup_range_max": 4.0,
   "riding_offset": true,
   "riding_offset_strength": 1.0,
-  "riding_offset_min": 0.25,
-  "riding_offset_max": 4.0,
+  "riding_offset_min": 0.0625,
+  "riding_offset_max": 16.0,
   "explosion_scale": true,
   "explosion_scale_strength": 1.0,
   "explosion_scale_min": 0.25,
@@ -81,8 +81,8 @@ The server creates the file with its defaults on first start. It is re-read by
 | `item_pickup_range_min` | 0.25 | Lower clamp on the pickup factor. Above 0 |
 | `item_pickup_range_max` | 4.0 | Upper clamp on the pickup factor. At least the minimum |
 | `riding_offset_strength` | 1.0 | Multiplier on the followed seat factor. 0 to 4 |
-| `riding_offset_min` | 0.25 | Lower clamp on the seat factor. Above 0 |
-| `riding_offset_max` | 4.0 | Upper clamp on the seat factor. At least the minimum |
+| `riding_offset_min` | 0.0625 | Lower clamp on the seat factor. The bottom of the scale envelope |
+| `riding_offset_max` | 16.0 | Upper clamp on the seat factor. The top of the scale envelope |
 | `explosion_scale_strength` | 1.0 | Multiplier on the followed explosion factor. 0 to 4 |
 | `explosion_scale_min` | 0.25 | Lower clamp on the explosion factor. Above 0 |
 | `explosion_scale_max` | 3.0 | Upper clamp on the explosion factor. At least the minimum |
