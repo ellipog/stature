@@ -11,7 +11,7 @@ class FrameSpecTest {
 
     private static final double DELTA = 1.0E-5;
 
-    /** Zephyr, from Kindred's roster: 0.55 x 1.71 on a player's 0.6 x 1.8 base. */
+    /** A sample small frame: 0.55 x 1.71 on a player's 0.6 x 1.8 base. */
     private static final FrameSpec ZEPHYR = FrameSpec.of(0.55F, 1.71F, 0.55F);
 
     @Test
