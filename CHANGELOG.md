@@ -21,8 +21,8 @@ Stature has not been released yet. This section covers everything on `master` so
   viewers.
 - Hurt regions on frames: a rig group, a damage multiplier and a tag, resolved from projectile
   impact points or a validated melee view ray.
-- Forty-four built-in channels for reach, step, motion, jump, flight, safe fall, combat, defence,
-  health, AI ranges, physics constants, knockback, voice pitch, saturation and rendering.
+- Forty-three built-in channels for reach, step, motion, jump, flight, safe fall, combat, defence,
+  health, AI ranges, physics constants, knockback, saturation and rendering.
 - `config/stature.json` with micro and macro edges and flags for porous traversal, surface
   climbing, amplified knockback, trampling, seismic footsteps and doorway compression.
 - Trampling that respects claims, spawn protection and mob griefing, with a per-scan cap and an
@@ -49,6 +49,11 @@ Stature has not been released yet. This section covers everything on `master` so
   model survives.
 - Scale reads and writes use the base value of `minecraft:scale`, so another mod's modifier
   multiplies on top without being folded in.
+
+### Removed
+
+- The `stature:voice_pitch` channel. Voice mods compute pitch from height themselves. A world that
+  saved the old id still loads: the unknown channel is skipped quietly.
 
 ### Fixed
 

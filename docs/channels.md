@@ -15,7 +15,7 @@ value = override, else basis ^ exponent
 The basis is usually the uniform scale. Body-physics channels follow it so reach, step, motion,
 jump and flight feel proportional. Combat, defence, health, AI ranges and physics constants do not
 follow, because vanilla already scales what needs scaling and following would double-apply it or
-clamp it into nonsense. Stature has 44 built-in channels; a mod may declare more, and any id
+clamp it into nonsense. Stature has 43 built-in channels; a mod may declare more, and any id
 outside the `stature:` namespace is experimental.
 
 ## Taxonomy
@@ -27,7 +27,7 @@ outside the `stature:` namespace is experimental.
 | Physics constants | `gravity`, `friction`, `air_drag`, `bounciness`, `fall_damage`, `movement_efficiency`, `water_movement_efficiency`, `sneaking_speed` | Off until overridden |
 | Already scaled by vanilla | `camera_distance` | Off; an override bends the vanilla result further |
 | Visibility distances | `name_tag_distance`, `below_name_distance` | Off; an override shortens or lengthens how far a name is visible |
-| Multiplier channels | `knockback_received`, `knockback_dealt`, `voice_pitch`, `saturation` | Follows where the law exists, otherwise off |
+| Multiplier channels | `knockback_received`, `knockback_dealt`, `saturation` | Follows where the law exists, otherwise off |
 | Render only | `model`, `visibility`, `held_item`, `shadow` | `model` follows the scale; `shadow` is off because vanilla already scales it; the rest are off |
 
 ## The built-in channels
@@ -77,7 +77,6 @@ overridden. The exponent is what the basis is raised to.
 | `stature:saturation` | NONE | 1.0 | Hunger exhaustion |
 | `stature:knockback_received` | BASE | -0.5 | Incoming knockback power |
 | `stature:knockback_dealt` | BASE | 0.5 | Outgoing knockback power |
-| `stature:voice_pitch` | BASE | -0.35 | A voice mod's pitch; nothing reads it yet |
 | `stature:visibility` | NONE | 1.0 | Hides the model, name tag and shadow below 0.5 |
 | `stature:held_item` | NONE | 1.0 | The held item, scaled around the hand |
 | `stature:shadow` | NONE | 1.0 | Shadow radius, on top of vanilla's own scale follow |
@@ -113,6 +112,9 @@ players tracking it, and the effects are re-derived on load.
 `stature:below_name_distance` was called `stature:name_tag_height` before the channel defaults
 were corrected. A saved override under the old id loads onto the new channel, and the rename is
 logged once.
+
+A saved override for a channel this version no longer declares is skipped when the entity loads,
+rather than failing the save.
 
 `camera_distance` is off because vanilla already multiplies it by the entity's scale, so following
 it here would square the effect. `name_tag_distance` and `below_name_distance` are off for a

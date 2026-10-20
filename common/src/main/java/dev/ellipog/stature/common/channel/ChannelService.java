@@ -22,9 +22,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Owns every channel value on every entity (plan §14.9).
  *
@@ -42,8 +39,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class ChannelService {
 
-    private static final Logger LOG = LoggerFactory.getLogger("stature");
-
     /** The visual size multiplier, read by the render path. No sim-side effect. */
     public static final String MODEL = "stature:model";
 
@@ -53,7 +48,7 @@ public final class ChannelService {
     /**
      * Which game attribute each value channel drives. Absent by design for {@code model} (visual
      * only), {@code saturation} (driven through food exhaustion instead), and anything a future
-     * layer owns (knockback pair, voice, camera raycast): no entry, no write.
+     * layer owns (knockback pair, camera raycast): no entry, no write.
      */
     private static final Map<String, Holder<Attribute>> ATTRIBUTES = Map.ofEntries(
             Map.entry("stature:reach_block", Attributes.BLOCK_INTERACTION_RANGE),
@@ -92,18 +87,6 @@ public final class ChannelService {
             Map.entry("stature:camera_distance", Attributes.CAMERA_DISTANCE),
             Map.entry("stature:name_tag_distance", Attributes.NAME_TAG_DISTANCE),
             Map.entry("stature:below_name_distance", Attributes.BELOW_NAME_DISTANCE));
-
-    private static final String KEY_CHANNELS = "stature_channels";
-
-    /**
-     * The pre-M1 id for {@code stature:below_name_distance}. Saved overrides under the old id
-     * load onto the new channel, so a world written before the rename keeps its value.
-     */
-    static final String LEGACY_NAME_TAG_HEIGHT = "stature:name_tag_height";
-
-    /** Whether the rename alias above has been logged: the note fires once, not per entity. */
-    private static final java.util.concurrent.atomic.AtomicBoolean LEGACY_ALIAS_LOGGED =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     private ChannelService() {
     }
@@ -375,50 +358,18 @@ public final class ChannelService {
      */
     public static boolean load(LivingEntity entity, ValueInput input) {
         StatureScale duck = (StatureScale) entity;
-        ChannelRegistry registry = ChannelRegistry.instance();
-        boolean[] seen = new boolean[1];
+        Map<String, Float> overrides = duck.stature$channelOverrides();
+        boolean seen = ChannelSaveCodec.restore(input, overrides);
 
-        input.childrenListOrEmpty(KEY_CHANNELS).forEach(child -> {
-            seen[0] = true;
-            String id = child.getString("id").orElse(null);
-            float value = child.getFloatOr("value", Float.NaN);
-            if (LEGACY_NAME_TAG_HEIGHT.equals(id)) {
-                if (LEGACY_ALIAS_LOGGED.compareAndSet(false, true)) {
-                    LOG.info("loading a saved stature:name_tag_height override as "
-                            + "stature:below_name_distance (renamed in M1)");
-                }
-                id = "stature:below_name_distance";
-            }
-            if (id == null || registry.get(id) == null) {
-                LOG.warn("ignoring a saved channel nobody declared ({}); it stays off", id);
-                return;
-            }
-            if (!Float.isFinite(value)) {
-                LOG.warn("ignoring a saved channel value that is not a value ({}); it stays off", id);
-                return;
-            }
-            duck.stature$channelOverrides().put(id, value);
-        });
-
-        if (seen[0] && !entity.level().isClientSide() && !duck.stature$channelOverrides().isEmpty()) {
+        if (seen && !entity.level().isClientSide() && !overrides.isEmpty()) {
             applyAttributes(entity);
         }
-        return seen[0];
+        return seen;
     }
 
     /** Saves overrides only: easing progress is transient, targets travel. */
     public static void save(LivingEntity entity, ValueOutput output) {
-        Map<String, Float> overrides = ((StatureScale) entity).stature$channelOverrides();
-        if (overrides.isEmpty()) {
-            return;
-        }
-
-        ValueOutput.ValueOutputList list = output.childrenList(KEY_CHANNELS);
-        for (Map.Entry<String, Float> entry : overrides.entrySet()) {
-            ValueOutput child = list.addChild();
-            child.putString("id", entry.getKey());
-            child.putFloat("value", entry.getValue());
-        }
+        ChannelSaveCodec.save(((StatureScale) entity).stature$channelOverrides(), output);
     }
 
     private static float resolvedValue(LivingEntity entity, ChannelSpec spec) {

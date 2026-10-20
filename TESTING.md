@@ -21,7 +21,7 @@ world. The last-verified column stays blank until a person has run the row.
 .\gradlew.bat :api:test :common:test
 ```
 
-The game-free suite is 179 tests: 43 in `:api` and 136 in `:common`, including the docs coverage
+The game-free suite is 180 tests: 43 in `:api` and 137 in `:common`, including the docs coverage
 test. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server gametests
 because Loom wires `check` to `runGameTest`.
 

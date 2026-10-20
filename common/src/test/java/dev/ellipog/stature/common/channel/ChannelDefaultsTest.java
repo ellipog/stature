@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins every built-in channel's default follow and exponent (plan M1).
  *
- * <p>A future edit to the defaults is a conscious test change: the table below names all 44
+ * <p>A future edit to the defaults is a conscious test change: the table below names all 43
  * built-ins explicitly, so adding, removing or retuning a channel fails here first. Body
  * physics follows the base with a tuned exponent; combat, defence, health, AI ranges and
  * physics constants are override-only (Pehkui parity); the camera and name-tag channels stay
@@ -65,7 +65,6 @@ class ChannelDefaultsTest {
             new Row("stature:saturation", ChannelFollow.NONE, 1.0),
             new Row("stature:knockback_received", ChannelFollow.BASE, -0.5),
             new Row("stature:knockback_dealt", ChannelFollow.BASE, 0.5),
-            new Row("stature:voice_pitch", ChannelFollow.BASE, -0.35),
             new Row("stature:visibility", ChannelFollow.NONE, 1.0),
             new Row("stature:held_item", ChannelFollow.NONE, 1.0),
             new Row("stature:shadow", ChannelFollow.NONE, 1.0),
