@@ -14,6 +14,18 @@ neoForge {
         client {
             client()
         }
+        // Gametests (improvement plan M4): headless server run, executed as
+        // `:neoforge:runGameTestServer`. Only this run sets
+        // stature.gametest, so only it registers the shared bodies in
+        // NeoForgeStatureGameTests; every other run (and the shipped jar)
+        // never sees them. enabledGameTestNamespaces comes from the
+        // configureEach above. EULA acceptance for gametest runs is
+        // approved (plan Q14); if this run ever asks for it, the agreement
+        // belongs in its run dir, never in a committed file.
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'stature.gametest', 'true'
+        }
         data {
             data()
 

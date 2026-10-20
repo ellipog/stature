@@ -1,0 +1,22 @@
+{
+    "schemaVersion": 1,
+    "id": "stature-gametest",
+    "version": "0.1.0",
+    "name": "Stature Gametests",
+    "description": "Automated in-game tests for Stature. Lives only in the gametest source set; never shipped.",
+    "license": "MIT",
+    "environment": "*",
+    "entrypoints": {
+        "fabric-gametest": [
+            "dev.ellipog.stature.gametest.StatureFabricGameTests"
+        ],
+        "fabric-client-gametest": [
+            "dev.ellipog.stature.gametest.StatureFabricClientGameTests"
+        ]
+    },
+    "depends": {
+        "fabricloader": ">=0.19.5",
+        "minecraft": "26.3",
+        "java": ">=25"
+    }
+}

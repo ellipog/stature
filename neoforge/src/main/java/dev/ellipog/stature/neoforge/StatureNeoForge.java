@@ -57,6 +57,11 @@ public final class StatureNeoForge {
     private static final Logger LOG = LoggerFactory.getLogger("stature");
 
     public StatureNeoForge(IEventBus modEventBus) {
+        // Gametests (plan M4): registers nothing in a normal run. The
+        // gameTestServer run sets -Dstature.gametest=true, and only then do
+        // the shared bodies become test instances.
+        NeoForgeStatureGameTests.register(modEventBus);
+
         StatureNetworking.install(new NeoForgeStatureNetwork());
 
         modEventBus.addListener((RegisterPayloadHandlersEvent event) ->

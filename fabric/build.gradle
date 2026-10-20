@@ -35,3 +35,48 @@ loom {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Gametests (improvement plan M4).
+//
+// This creates the `gametest` source set (src/gametest/) and the `gameTest`
+// and `clientGameTest` run configs, run with `:fabric:runGameTest` and
+// `:fabric:runClientGameTest` (run dirs build/run/gameTest and
+// build/run/clientGameTest). The test bodies live in :common and are shared
+// with NeoForge; the source set only registers them.
+//
+// eula = true: Elliot has accepted the Minecraft EULA for these run dirs
+// (plan Q14). The server suite runs headless; the client suite needs a
+// display (xvfb-run on CI, a logged-in session locally) and takes
+// screenshots instead of asserting pixels.
+//
+// src/gametest/resources/fabric.mod.json carries literal versions, not
+// ${...} placeholders: Loom creates a separate processGametestResources
+// task that the main expansion block does not touch, so placeholders would
+// arrive verbatim and fail loader parsing. Bump the literals with the
+// gradle.properties versions.
+// ---------------------------------------------------------------------------
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'stature-gametest'
+        enableGameTests = true
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
+// Loom 1.17.21's acceptGameTestEula task writes the clientGameTest run directory, not the
+// headless gameTest one, so the server run starts with no eula.txt and writes a default
+// eula=false (and logs "Failed to load eula.txt"). Q14 approved acceptance, so write the
+// file the gameTest server actually reads; GameTestServer does not check it, this only
+// keeps the run directory consistent with the approved setting and the log quiet.
+tasks.configureEach {
+    if (name == 'runGameTest') {
+        doFirst {
+            def eula = file('build/run/gameTest/eula.txt')
+            eula.parentFile.mkdirs()
+            eula.text = 'eula=true\n'
+        }
+    }
+}

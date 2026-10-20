@@ -30,3 +30,6 @@ runs
 .server.log
 .deploy.log
 .build.log
+
+# gametest and run profiles write logs under the module that ran them
+common/logs/
