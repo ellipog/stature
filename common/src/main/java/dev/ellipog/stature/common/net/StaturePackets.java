@@ -195,7 +195,7 @@ public final class StaturePackets {
                     new Vec3(entity.getX(), entity.getY(), entity.getZ()),
                     FootstepScope.radius(volume),
                     new FootstepPayload(
-                            entity.getX(), entity.getY(), entity.getZ(),
+                            entity.getId(), entity.getX(), entity.getY(), entity.getZ(),
                             ScaleService.stateOf(entity).scale()));
         }
     }

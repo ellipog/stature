@@ -106,7 +106,7 @@ public final class StatureClientHandlers {
         if (camera != null) {
             CameraTrauma.addShake(
                     payload.x(), payload.y(), payload.z(), payload.scale(), camera,
-                    ClientViews.screenEffectScale());
+                    ClientViews.screenEffectScale(), ClientViews.isCameraEntity(payload.entityId()));
         }
     }
 

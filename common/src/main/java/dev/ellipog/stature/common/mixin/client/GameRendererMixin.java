@@ -18,7 +18,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *
  * <p>Rides the walk-bob pass so the existing view-bob toggle governs shaking too: players
  * who turn bobbing off for comfort get no shake either. Two sines keep it rolling rather
- * than vibrating, capped where a giant next door reads as weather rather than damage.
+ * than vibrating. The trauma is already capped per source by {@link CameraTrauma}: nearby
+ * steps top out at 0.6 and the walker's own steps at 0.15, so the worst roll and pitch here
+ * are 1.8 and 1.2 degrees for an observer, and 0.45 and 0.3 degrees for the giant itself.
  */
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin {

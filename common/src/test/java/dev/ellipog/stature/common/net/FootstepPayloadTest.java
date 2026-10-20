@@ -14,8 +14,10 @@ class FootstepPayloadTest {
     void valuesSurviveTheWire() {
         RegistryFriendlyByteBuf buffer =
                 new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY);
-        FootstepPayload.STREAM_CODEC.encode(buffer, new FootstepPayload(8.5, 100.0, -3.25, 3.0F));
+        FootstepPayload.STREAM_CODEC.encode(
+                buffer, new FootstepPayload(42, 8.5, 100.0, -3.25, 3.0F));
         FootstepPayload decoded = FootstepPayload.STREAM_CODEC.decode(buffer);
+        assertEquals(42, decoded.entityId());
         assertEquals(8.5, decoded.x());
         assertEquals(100.0, decoded.y());
         assertEquals(-3.25, decoded.z());

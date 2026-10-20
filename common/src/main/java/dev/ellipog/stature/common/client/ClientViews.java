@@ -28,6 +28,12 @@ public final class ClientViews {
         return camera == null ? null : camera.position();
     }
 
+    /** Whether this entity id is the one the camera is riding, so its steps are the player's own. */
+    public static boolean isCameraEntity(int entityId) {
+        Entity camera = Minecraft.getInstance().getCameraEntity();
+        return camera != null && camera.getId() == entityId;
+    }
+
     /**
      * The vanilla Screen Effect accessibility slider, 0 to 1.
      *
