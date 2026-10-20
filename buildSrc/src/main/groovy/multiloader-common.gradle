@@ -23,6 +23,33 @@ java {
 
 repositories {
     mavenCentral()
+
+    // Armature, during local development.
+    //
+    // Stature compiles against Armature's published artefact rather than its source tree: the
+    // composite-build substitution the plan originally called for fought Loom's and ModDevGradle's
+    // variant attributes, so Maven local is the fallback and the closer match to how the release
+    // works. Publish Armature first; a change that has not been published is invisible here, and
+    // the compiler error names a method that is in the file you just edited.
+    //
+    // Filtered to dev.ellipog on purpose: a bare mavenLocal() would shadow every other dependency
+    // in this build with whatever happens to be sitting in ~/.m2.
+    maven {
+        name = 'ArmatureLocal'
+        url = mavenLocal().url
+        content { includeGroup('dev.ellipog') }
+    }
+
+    // The same artefacts as everybody else gets. Armature's release workflow publishes to
+    // https://maven.ellipog.dev on every tag, so a clone builds without a sibling checkout.
+    // Declared after ArmatureLocal on purpose: a locally published version still wins during
+    // development.
+    maven {
+        name = 'Ellipog'
+        url = 'https://maven.ellipog.dev'
+        content { includeGroup('dev.ellipog') }
+    }
+
     // https://docs.gradle.org/current/userguide/declaring_repositories.html#declaring_content_exclusively_found_in_one_repository
     exclusiveContent {
         forRepository {
@@ -37,11 +64,10 @@ repositories {
     // (A ParchmentMC repository block lived here until the 26.3 port: 26.x is unobfuscated and
     // Parchment publishes nothing for it, so there is nothing left to resolve from it.)
     //
-    // Stature has no third-party dependencies at all: no parties mod, no energy library, nothing
-    // a consumer must have on its own classpath. If one ever earns its place, this is where its
-    // repository goes, and the declaration goes here rather than in a module -- because the loader
-    // projects *recompile common's sources* (see multiloader-loader.gradle), so a declaration in
-    // common alone would leave both loader projects unable to find the package.
+    // Armature is Stature's one dependency. Declared per module rather than here, and declared in
+    // all three because the loader projects *recompile common's sources* (see
+    // multiloader-loader.gradle), so a declaration in common alone would leave both loader
+    // projects unable to find the packages.
 }
 
 // Declare capabilities on the outgoing configurations.
@@ -103,6 +129,7 @@ processResources {
             'neoforge_version'             : neoforge_version,
             'neoforge_loader_version_range': neoforge_loader_version_range,
             'credits'                      : credits,
+            'armature_version'             : armature_version,
             'java_version'                 : java_version
     ]
 

@@ -15,6 +15,11 @@ dependencies {
     // recompile these sources and would otherwise be missing the package).
     implementation project(':api')
 
+    // Armature's API, the only part of it Stature names anything from. compileOnly because
+    // Armature is a separate mod jar at runtime, loaded by the loader: it is never bundled into
+    // Stature's jar, and there is nothing for Loom or ModDevGradle to remap here.
+    compileOnly "dev.ellipog:armature-common-${minecraft_version}:${armature_version}"
+
     compileOnly 'org.spongepowered:mixin:0.8.5'
     // fabric and neoforge both bundle mixinextras, so it is safe to use it in common
     compileOnly 'io.github.llamalad7:mixinextras-common:0.3.5'
@@ -40,6 +45,11 @@ sourceSets {
 }
 
 dependencies {
+    // compileOnly does not reach the test runtime, and a test JVM has no mod loader to hand it
+    // the jar -- so a test that touches an Armature class would compile and then die with
+    // NoClassDefFoundError. The test source set declares it for itself.
+    testImplementation "dev.ellipog:armature-common-${minecraft_version}:${armature_version}"
+
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

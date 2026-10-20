@@ -20,6 +20,16 @@ versionRange = "[${neoforge_version},)"
 ordering = "NONE"
 side = "BOTH"
 
+# Armature is required, not optional. NeoForge refuses to load Stature without it and says so
+# by name, which is the failure we want: the alternative is a NoClassDefFoundError naming a
+# class the player has never heard of.
+[[dependencies.${mod_id}]]
+modId = "armature"
+type = "required"
+versionRange = "[${armature_version},)"
+ordering = "AFTER"
+side = "BOTH"
+
 [[dependencies.${mod_id}]]
 modId = "minecraft"
 type = "required"

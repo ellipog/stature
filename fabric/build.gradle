@@ -13,6 +13,14 @@ dependencies {
     // :api is on the compile classpath here, and its classes ride inside this jar (see
     // multiloader-loader.gradle): a profile needs this one jar, not a second api jar.
     implementation project(':api')
+
+    // Armature's common API. Declared here too, and not inherited from :common, because
+    // compileOnly does not travel through apiElements and these sources genuinely use it.
+    compileOnly "dev.ellipog:armature-common-${minecraft_version}:${armature_version}"
+
+    // A dev run is a real game with a real mod loader, and fabric.mod.json requires Armature --
+    // so without this the first thing a dev server does is refuse to start.
+    runtimeOnly "dev.ellipog:armature-fabric-${minecraft_version}:${armature_version}"
 }
 
 loom {
