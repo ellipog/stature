@@ -39,7 +39,7 @@ change lands at once; with ticks and no easing name it uses `cubic`.
 
 ## Selecting by scale
 
-Any entity selector accepts Stature's option:
+Any entity selector accepts Stature's [[scale-selector|scale option]]:
 
 ```cmd
 /stature set @e[stature:scale=0.5..2] 3

@@ -132,8 +132,8 @@ constructed, so the server calculation and the packet that draws the particles a
 
 ### Drops
 
-Only loot-table drops are touched. Equipment, inventory contents and custom death drops do not
-pass through the loot-table consumer and are left alone. The count of each generated stack is
+Only loot-table drops are touched. This is [[loot-scaling|loot scaling]], and equipment, inventory
+contents and custom death drops do not pass through the loot-table consumer and are left alone. The count of each generated stack is
 multiplied, never re-rolled: luck, looting, the loot seed and conditions produce exactly the
 vanilla roll.
 

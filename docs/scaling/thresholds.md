@@ -90,6 +90,10 @@ The server creates the file with its defaults on first start. It is re-read by
 | `drops_scale_min` | 1.0 | Lower clamp on the drops factor. 1.0 means never less than vanilla |
 | `drops_scale_max` | 3.0 | Upper clamp on the drops factor. At least the minimum |
 
+The five physical extras share one [[channel-tuning|tuning family]]: an on/off flag, a strength
+multiplier and min/max clamps. The strength applies only to the followed value, while the clamps
+apply to an explicit override too, because they are a hitbox and explosion safety bound.
+
 `comment` is accepted and ignored so an older default file does not log an unknown key. Any other
 unknown key is logged and skipped. A malformed file is reported and the previous values are kept.
 The two edges must satisfy `0 < micro < macro`; a frame can move either edge for its entities.
