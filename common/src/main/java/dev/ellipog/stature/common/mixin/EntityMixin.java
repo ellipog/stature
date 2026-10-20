@@ -17,7 +17,7 @@ import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 import dev.ellipog.stature.common.parts.PartService;
 
 import net.minecraft.core.Holder;
@@ -132,7 +132,7 @@ public abstract class EntityMixin {
                     soundType.getPitch() * Thresholds.stepPitch(living, 1.0F));
             info.cancel();
             if (!living.level().isClientSide()) {
-                StatureNetworking.broadcastFootstep(living, volume);
+                StaturePackets.broadcastFootstep(living, volume);
             }
         }
     }
@@ -353,18 +353,18 @@ public abstract class EntityMixin {
                 scaled.stature$setNeedsSync(true);
             }
             if (custom) {
-                StatureNetworking.broadcast(living, ScaleService.stateOf(living));
+                StaturePackets.broadcast(living, ScaleService.stateOf(living));
             }
             StatureConfig.pushThresholds(living, StatureEvents.Cause.LOAD);
             if (channels) {
-                StatureNetworking.broadcast(living, ChannelService.syncMap(living));
+                StaturePackets.broadcast(living, ChannelService.syncMap(living));
             }
             if (parts || scaled.stature$firstPersonVanilla()) {
                 // The hands flag rides the parts packet, so a framed entity whose silhouette
                 // is otherwise vanilla still has to send it: without this a
                 // first_person_arms frame with no parts would read vanilla on the server
                 // after a load and vanilla everywhere on the clients tracking it.
-                StatureNetworking.broadcastParts(living, PartService.syncMap(living));
+                StaturePackets.broadcastParts(living, PartService.syncMap(living));
             }
         }
     }

@@ -1,102 +1,25 @@
 package dev.ellipog.stature.fabric;
 
-import dev.ellipog.stature.common.ResolvedThresholds;
-import dev.ellipog.stature.common.ScaleService;
-import dev.ellipog.stature.common.StatureConfig;
-import dev.ellipog.stature.common.StatureScale;
-import dev.ellipog.stature.common.channel.ChannelService;
-import dev.ellipog.stature.common.net.AxesPayload;
-import dev.ellipog.stature.common.net.ChannelsPayload;
-import dev.ellipog.stature.common.client.CameraTrauma;
-import dev.ellipog.stature.common.client.ClientViews;
-import dev.ellipog.stature.common.net.ConfigPayload;
-import dev.ellipog.stature.common.net.FootstepPayload;
-import dev.ellipog.stature.common.net.HandshakePayload;
-import dev.ellipog.stature.common.net.PartsPayload;
-import dev.ellipog.stature.common.net.ThresholdsPayload;
+import dev.ellipog.armature.api.net.ArmatureNetwork;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * The client receiver, in a client entry point so a dedicated server never loads it.
  *
- * <p>The entity is looked up by id in the client level rather than trusted from the packet: an id
- * for an entity this client has not received yet is a packet that arrived before its spawn, and the
- * right answer there is to ignore it once the next broadcast carries the same size.
+ * <p>The declarations and the backend are repeated here because Fabric does not promise whether
+ * the common initialiser or this one runs first. Both are idempotent: declaring twice is a no-op,
+ * and installation keeps the first backend. Without this, a client that ran its client
+ * initialiser first would register zero receivers, because the declaration list was still empty,
+ * and every sync would vanish with no error anywhere.
  */
 public final class StatureFabricClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        ClientPlayNetworking.registerGlobalReceiver(AxesPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> {
-                    if (context.client().level == null) {
-                        return;
-                    }
-                    Entity entity = context.client().level.getEntity(payload.entityId());
-                    if (entity instanceof LivingEntity living) {
-                        ScaleService.applyFromServer(living, payload.state(), payload.eyeHeight());
-                    }
-                }));
-        ClientPlayNetworking.registerGlobalReceiver(ChannelsPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> {
-                    if (context.client().level == null) {
-                        return;
-                    }
-                    Entity entity = context.client().level.getEntity(payload.entityId());
-                    if (entity instanceof LivingEntity living) {
-                        // Full replace, never merge: a key missing here was removed there, and a
-                        // merge would keep the dead key forever. The service also reports the
-                        // differences to StatureEvents on this thread.
-                        ChannelService.applyFromServer(living, payload.channels());
-                    }
-                }));
-        ClientPlayNetworking.registerGlobalReceiver(PartsPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> {
-                    if (context.client().level == null) {
-                        return;
-                    }
-                    Entity entity = context.client().level.getEntity(payload.entityId());
-                    if (entity instanceof LivingEntity living) {
-                        StatureScale duck = (StatureScale) living;
-                        duck.stature$partFactors().clear();
-                        duck.stature$partFactors().putAll(payload.parts());
-                        duck.stature$setFirstPersonVanilla(payload.firstPersonVanilla());
-                    }
-                }));
-        ClientPlayNetworking.registerGlobalReceiver(ThresholdsPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> {
-                    if (context.client().level == null) {
-                        return;
-                    }
-                    Entity entity = context.client().level.getEntity(payload.entityId());
-                    if (entity instanceof LivingEntity living) {
-                        // Full replace, like the channels: the server resolved this entity's
-                        // frame over the configured values, and a removal there reads as a
-                        // re-resolve here rather than a merge that keeps the dead key. The
-                        // service reports a tier crossing after storing the new edges.
-                        StatureConfig.applyFromServer(
-                                living,
-                                new ResolvedThresholds(payload.micro(), payload.macro(), payload.flags()));
-                    }
-                }));
-        ClientPlayNetworking.registerGlobalReceiver(ConfigPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> StatureConfig.applySynced(
-                        payload.micro(), payload.macro(), payload.flags(), payload.tuning())));
-        ClientPlayNetworking.registerGlobalReceiver(FootstepPayload.TYPE, (payload, context) ->
-                context.client().execute(() -> {
-                    Vec3 camera = ClientViews.cameraPosition();
-                    if (camera != null) {
-                        CameraTrauma.addShake(payload.x(), payload.y(), payload.z(),
-                                payload.scale(), camera, ClientViews.screenEffectScale());
-                    }
-                }));
-        ClientPlayNetworking.registerGlobalReceiver(HandshakePayload.TYPE, (payload, context) ->
-                context.client().execute(() -> ClientPlayNetworking.send(new HandshakePayload())));
+        StaturePackets.declare();
+        ArmatureNetwork.install(new FabricNetworkBackend());
+        FabricClientNetworking.registerClientReceivers();
     }
 }

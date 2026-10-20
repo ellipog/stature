@@ -16,6 +16,13 @@ public final class ClientViews {
     private ClientViews() {
     }
 
+    /** An entity in the client level by id, or null before the world exists or before its spawn. */
+    public static Entity entity(int id) {
+        return Minecraft.getInstance().level == null
+                ? null
+                : Minecraft.getInstance().level.getEntity(id);
+    }
+
     /** Where the camera entity stands, or null before the world exists. */
     public static Vec3 cameraPosition() {
         Entity camera = Minecraft.getInstance().getCameraEntity();

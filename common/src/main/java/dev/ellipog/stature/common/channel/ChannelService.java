@@ -17,7 +17,7 @@ import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.api.StatureEvents;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
@@ -147,7 +147,7 @@ public final class ChannelService {
             // An empty map never reaches here (the override was just put), and a reset below sends
             // even an empty one: the receiver replaces its whole map, so an empty send is how a
             // removal travels rather than a packet dropped for having nothing in it.
-            StatureNetworking.broadcast(entity, syncMap(entity));
+            StaturePackets.broadcast(entity, syncMap(entity));
             StatureEvents.fireChannelChanged(entity, id, before, value, cause);
         });
     }
@@ -176,7 +176,7 @@ public final class ChannelService {
             duck.stature$channelTransitions().remove(id);
             duck.stature$channelCauses().remove(id);
             applyAttributes(entity);
-            StatureNetworking.broadcast(entity, syncMap(entity));
+            StaturePackets.broadcast(entity, syncMap(entity));
             if (before != null) {
                 StatureEvents.fireChannelChanged(entity, id, before, null, cause);
             }
@@ -212,7 +212,7 @@ public final class ChannelService {
             duck.stature$setDangerousModel(false);
             applyAttributes(entity);
             if (hadAny) {
-                StatureNetworking.broadcast(entity, Map.of());
+                StaturePackets.broadcast(entity, Map.of());
             }
             fireChanges(entity, before, Map.of(), cause);
         });
@@ -335,7 +335,7 @@ public final class ChannelService {
                 // The client holds a copy of the overrides for what it draws, so an eased value is
                 // re-sent every tick it moves -- the same cadence as a shape mid-ease, for the same
                 // reason: the far end converges instead of snapping.
-                StatureNetworking.broadcast(entity, syncMap(entity));
+                StaturePackets.broadcast(entity, syncMap(entity));
                 changes.sort(Comparator.comparing(Change::id));
                 for (Change change : changes) {
                     StatureEvents.fireChannelChanged(

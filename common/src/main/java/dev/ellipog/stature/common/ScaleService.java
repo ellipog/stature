@@ -6,7 +6,7 @@ import dev.ellipog.stature.api.ScaleLimits;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -147,7 +147,7 @@ public final class ScaleService {
             if (shapeChanged && !entity.level().isClientSide()) {
                 // Only when the shape moved: a uniform ease changes the attribute twenty times and
                 // the shape not at all, and vanilla already syncs that attribute every tick.
-                StatureNetworking.broadcast(entity, state);
+                StaturePackets.broadcast(entity, state);
             }
 
             ScaleState after = stateOf(entity);

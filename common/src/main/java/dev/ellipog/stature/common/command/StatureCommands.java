@@ -32,7 +32,7 @@ import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -694,7 +694,7 @@ public final class StatureCommands {
         StatureConfig.reload();
         int count = FrameService.reloadFrameData(server.getResourceManager());
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            StatureNetworking.sendConfigTo(player,
+            StaturePackets.sendConfigTo(player,
                     StatureConfig.microThreshold(), StatureConfig.macroThreshold(),
                     StatureConfig.flagSnapshot(), StatureConfig.tuningSnapshot());
         }

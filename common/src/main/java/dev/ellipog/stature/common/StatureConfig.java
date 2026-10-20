@@ -14,7 +14,7 @@ import dev.ellipog.armature.api.data.DataProblem;
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
@@ -480,7 +480,7 @@ public final class StatureConfig {
             }
             StatureEvents.ThresholdTier before = StatureEvents.tierOf(entity);
             duck.stature$setThresholds(resolved);
-            StatureNetworking.broadcastThresholds(entity, wireValues(entity, resolved));
+            StaturePackets.broadcastThresholds(entity, wireValues(entity, resolved));
             StatureEvents.fireTierChanged(entity, before, cause);
         });
     }
@@ -504,7 +504,7 @@ public final class StatureConfig {
         StatureEvents.batch(() -> {
             StatureEvents.ThresholdTier before = StatureEvents.tierOf(entity);
             ((StatureScale) entity).stature$setThresholds(resolved);
-            StatureNetworking.sendThresholdsTo(player, entity, resolved);
+            StaturePackets.sendThresholdsTo(player, entity, resolved);
             StatureEvents.fireTierChanged(entity, before, StatureEvents.Cause.SYNC);
         });
     }

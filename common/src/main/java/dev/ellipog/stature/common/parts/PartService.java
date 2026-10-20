@@ -10,7 +10,7 @@ import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.LivingEntity;
@@ -75,7 +75,7 @@ public final class PartService {
         } else {
             duck.stature$partTransitions().put(path, AxesTransition.between(from, factors, ticks, easing));
         }
-        StatureNetworking.broadcastParts(entity, syncMap(entity));
+        StaturePackets.broadcastParts(entity, syncMap(entity));
     }
 
     /** Drops one part's factors: the part draws vanilla again. */
@@ -85,7 +85,7 @@ public final class PartService {
         StatureScale duck = (StatureScale) entity;
         duck.stature$partFactors().remove(path);
         duck.stature$partTransitions().remove(path);
-        StatureNetworking.broadcastParts(entity, syncMap(entity));
+        StaturePackets.broadcastParts(entity, syncMap(entity));
     }
 
     /** Drops every part factor: the whole silhouette draws vanilla again. */
@@ -95,7 +95,7 @@ public final class PartService {
         StatureScale duck = (StatureScale) entity;
         duck.stature$partFactors().clear();
         duck.stature$partTransitions().clear();
-        StatureNetworking.broadcastParts(entity, syncMap(entity));
+        StaturePackets.broadcastParts(entity, syncMap(entity));
     }
 
     /** Whether this entity carries any part state worth saving or syncing. */
@@ -128,7 +128,7 @@ public final class PartService {
         }
 
         if (changed) {
-            StatureNetworking.broadcastParts(entity, syncMap(entity));
+            StaturePackets.broadcastParts(entity, syncMap(entity));
         }
     }
 

@@ -19,7 +19,7 @@ import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -470,13 +470,13 @@ public abstract class LivingEntityMixin implements StatureScale {
         }
         this.stature$needsSync = false;
         if (FrameService.isCustomized(self)) {
-            StatureNetworking.sendTo(player, self, ScaleService.stateOf(self));
+            StaturePackets.sendTo(player, self, ScaleService.stateOf(self));
         }
         if (ChannelService.hasSyncedState(self)) {
-            StatureNetworking.sendTo(player, self, ChannelService.syncMap(self));
+            StaturePackets.sendTo(player, self, ChannelService.syncMap(self));
         }
         if (PartService.hasParts(self) || this.stature$firstPersonVanilla()) {
-            StatureNetworking.sendPartsTo(player, self, PartService.syncMap(self));
+            StaturePackets.sendPartsTo(player, self, PartService.syncMap(self));
         }
         if (FrameService.frameOf(self) != null) {
             StatureConfig.sendThresholds(player, self);

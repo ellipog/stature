@@ -17,7 +17,7 @@ import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
-import dev.ellipog.stature.common.net.StatureNetworking;
+import dev.ellipog.stature.common.net.StaturePackets;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
 
@@ -117,7 +117,7 @@ public final class FrameService {
             duck.stature$partTransitions().clear();
             ScaleService.setSize(
                     entity, ScaleState.UNIFORM, 0, Easing.LINEAR, StatureEvents.Cause.INTEGRATION);
-            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StaturePackets.broadcastParts(entity, PartService.syncMap(entity));
             StatureConfig.pushThresholds(entity, StatureEvents.Cause.INTEGRATION);
             StatureEvents.fireFrameChanged(
                     entity, beforeFrame, null, StatureEvents.Cause.INTEGRATION);
@@ -219,7 +219,7 @@ public final class FrameService {
             duck.stature$partTransitions().clear();
             ScaleService.setSize(
                     entity, ScaleState.UNIFORM, 0, Easing.LINEAR, StatureEvents.Cause.COMMAND);
-            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StaturePackets.broadcastParts(entity, PartService.syncMap(entity));
             StatureConfig.pushThresholds(entity, StatureEvents.Cause.COMMAND);
             StatureEvents.fireFrameChanged(
                     entity, beforeFrame, null, StatureEvents.Cause.COMMAND);
@@ -401,7 +401,7 @@ public final class FrameService {
             // size, and a caller who wants a different scale can follow it with /stature set.
             ScaleService.setSize(
                     entity, new ScaleState(frame.scale(), axes), ticks, frame.easing(), cause);
-            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StaturePackets.broadcastParts(entity, PartService.syncMap(entity));
             StatureConfig.pushThresholds(entity, cause);
             StatureEvents.fireFrameChanged(entity, beforeFrame, frameId, cause);
         });
@@ -507,7 +507,7 @@ public final class FrameService {
             duck.stature$partTransitions().clear();
             ScaleService.setSize(
                     entity, ScaleState.UNIFORM, 0, Easing.LINEAR, StatureEvents.Cause.FRAME);
-            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StaturePackets.broadcastParts(entity, PartService.syncMap(entity));
             StatureConfig.pushThresholds(entity, StatureEvents.Cause.FRAME);
             StatureEvents.fireFrameChanged(entity, beforeFrame, null, StatureEvents.Cause.FRAME);
         });

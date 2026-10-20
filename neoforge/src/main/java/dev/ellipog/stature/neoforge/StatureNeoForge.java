@@ -1,5 +1,7 @@
 package dev.ellipog.stature.neoforge;
 
+import dev.ellipog.armature.api.ArmatureApi;
+import dev.ellipog.armature.api.net.ArmatureNetwork;
 import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
@@ -10,15 +12,9 @@ import dev.ellipog.stature.common.command.StatureEntitySelectors;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureDataReload;
 import dev.ellipog.stature.common.frame.StatureFrames;
+import dev.ellipog.stature.common.net.StaturePackets;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
-import dev.ellipog.stature.common.net.AxesPayload;
-import dev.ellipog.stature.common.net.ChannelsPayload;
-import dev.ellipog.stature.common.net.ConfigPayload;
-import dev.ellipog.stature.common.net.FootstepPayload;
-import dev.ellipog.stature.common.net.PartsPayload;
-import dev.ellipog.stature.common.net.ThresholdsPayload;
-import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -42,11 +38,10 @@ import org.slf4j.LoggerFactory;
  * the constructor receives: NeoForge splits them, and putting either on the wrong one produces a
  * silent no-op rather than an error.
  *
- * <p>The payload <b>types and codecs</b> are registered here, on both sides. The client-bound
- * <b>handlers</b> are registered in {@code NeoForgeStatureClientPayloads} through
- * {@code RegisterClientPayloadHandlersEvent}, which only fires on a client: a dedicated server never
- * classloads that class, so a handler cannot pull {@code ClientViews} (and {@code Minecraft}) onto
- * the server through a lambda.
+ * <p>The payload declarations are common; Armature's NeoForge backend registers them inside
+ * {@link RegisterPayloadHandlersEvent}, on both sides, so one registration serves both directions.
+ * A client handler runs only on a client, which is why naming a client class in its lambda is safe
+ * on a dedicated server: the reference resolves when the handler runs, not when it is declared.
  */
 @Mod(Stature.MOD_ID)
 public final class StatureNeoForge {
@@ -59,15 +54,11 @@ public final class StatureNeoForge {
         // the shared bodies become test instances.
         NeoForgeStatureGameTests.register(modEventBus);
 
-        StatureNetworking.install(new NeoForgeStatureNetwork());
-
-        modEventBus.addListener((RegisterPayloadHandlersEvent event) -> event.registrar("1")
-                .playToClient(AxesPayload.TYPE, AxesPayload.STREAM_CODEC)
-                .playToClient(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC)
-                .playToClient(PartsPayload.TYPE, PartsPayload.STREAM_CODEC)
-                .playToClient(ThresholdsPayload.TYPE, ThresholdsPayload.STREAM_CODEC)
-                .playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC)
-                .playToClient(FootstepPayload.TYPE, FootstepPayload.STREAM_CODEC));
+        // Declare before install: the backend records declarations and the event registers them.
+        StaturePackets.declare();
+        ArmatureNetwork.install(new NeoForgeNetworkBackend());
+        modEventBus.addListener(RegisterPayloadHandlersEvent.class,
+                NeoForgeNetworkBackend::onRegisterPayloads);
 
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> {
             // After vanilla's Bootstrap, before the tree that can contain the selector.
@@ -85,12 +76,12 @@ public final class StatureNeoForge {
         // A viewer who arrives after the shape was set has never been told it.
         NeoForge.EVENT_BUS.addListener((PlayerEvent.StartTracking event) -> {
             if (event.getEntity() instanceof ServerPlayer player && event.getTarget() instanceof LivingEntity living) {
-                StatureNetworking.sendTo(player, living, ScaleService.stateOf(living));
+                StaturePackets.sendTo(player, living, ScaleService.stateOf(living));
                 if (ChannelService.hasSyncedState(living)) {
-                    StatureNetworking.sendTo(player, living, ChannelService.syncMap(living));
+                    StaturePackets.sendTo(player, living, ChannelService.syncMap(living));
                 }
                 if (PartService.hasParts(living) || ((StatureScale) living).stature$firstPersonVanilla()) {
-                    StatureNetworking.sendPartsTo(player, living, PartService.syncMap(living));
+                    StaturePackets.sendPartsTo(player, living, PartService.syncMap(living));
                 }
                 if (FrameService.frameOf(living) != null) {
                     StatureConfig.sendThresholds(player, living);
@@ -104,12 +95,12 @@ public final class StatureNeoForge {
             StatureDataReload.setServer(event.getServer());
             StatureFrames.load(event.getServer().getResourceManager());
             RigRegistry.instance().load(event.getServer().getResourceManager());
-            StatureConfig.load(net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get());
+            StatureConfig.load(ArmatureApi.platform().configDir());
         });
 
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
             if (event.getEntity() instanceof ServerPlayer player) {
-                StatureNetworking.sendConfigTo(player,
+                StaturePackets.sendConfigTo(player,
                         StatureConfig.microThreshold(), StatureConfig.macroThreshold(),
                         StatureConfig.flagSnapshot(), StatureConfig.tuningSnapshot());
             }
