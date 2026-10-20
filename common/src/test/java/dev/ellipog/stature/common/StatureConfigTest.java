@@ -10,6 +10,8 @@ import java.util.Map;
 
 import com.google.gson.JsonParser;
 
+import dev.ellipog.stature.api.ScaleAxes;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,7 +53,14 @@ class StatureConfigTest {
                   "drops_scale": true,
                   "drops_scale_strength": 1.0,
                   "drops_scale_min": 1.0,
-                  "drops_scale_max": 3.0
+                  "drops_scale_max": 3.0,
+                  "presets_enabled": true,
+                  "presets_builtin": true,
+                  "presets_disabled": [],
+                  "presets_custom": {},
+                  "relative_commands_enabled": true,
+                  "self_shortcuts_enabled": true,
+                  "self_command_permission_level": 2
                 }
                 """).getAsJsonObject(), "test");
     }
@@ -99,6 +108,20 @@ class StatureConfigTest {
         StatureConfig.load(dir);
         assertEquals(0.25F, StatureConfig.microThreshold());
         assertEquals(2.5F, StatureConfig.macroThreshold());
+    }
+
+    @Test
+    void loadReadsCustomPresets(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("stature.json"), """
+                {
+                  "presets_custom": {"kaiju": 6.0},
+                  "presets_disabled": ["titan"]
+                }
+                """);
+        StatureConfig.load(dir);
+        assertEquals(6.0F, StatureConfig.preset("kaiju").scale());
+        assertTrue(StatureConfig.preset("titan") == null,
+                "a disabled built-in survived a file load");
     }
 
     @Test
@@ -226,7 +249,9 @@ class StatureConfigTest {
             for (String key : new String[]{
                     "projectile_scale", "item_pickup_range", "riding_offset",
                     "explosion_scale", "drops_scale", "projectile_scale_min",
-                    "drops_scale_max"}) {
+                    "drops_scale_max", "presets_enabled", "presets_builtin",
+                    "presets_disabled", "presets_custom", "relative_commands_enabled",
+                    "self_shortcuts_enabled", "self_command_permission_level"}) {
                 assertTrue(written.contains("\"" + key + "\""), key);
             }
         } finally {
@@ -237,5 +262,126 @@ class StatureConfigTest {
             }
             Files.deleteIfExists(dir);
         }
+    }
+
+    @Test
+    void builtInPresetsAreAvailable() {
+        assertEquals(9, StatureConfig.presetCount());
+        assertEquals(0.25F, StatureConfig.preset("tiny").scale());
+        assertEquals(1.0F, StatureConfig.preset("normal").scale());
+        assertEquals(8.0F, StatureConfig.preset("titan").scale());
+        assertEquals(new ScaleAxes(0.75F, 1.5F, 0.75F),
+                StatureConfig.preset("tall").shape());
+        assertTrue(StatureConfig.preset("missing") == null);
+    }
+
+    @Test
+    void customPresetsAddAndOverrideBuiltIns() {
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "presets_custom": {
+                    "kaiju": 6.0,
+                    "giant": {"scale": 5.0},
+                    "lanky": {"shape": [0.7, 1.4, 0.7]},
+                    "boss": {"scale": 3.0, "shape": [1.2, 1.1, 1.2]}
+                  }
+                }
+                """).getAsJsonObject(), "test");
+
+        assertEquals(12, StatureConfig.presetCount());
+        assertEquals(6.0F, StatureConfig.preset("kaiju").scale());
+        assertEquals(5.0F, StatureConfig.preset("giant").scale(),
+                "a custom preset did not override the built-in with the same name");
+        assertEquals(new ScaleAxes(0.7F, 1.4F, 0.7F),
+                StatureConfig.preset("lanky").shape());
+        assertEquals(3.0F, StatureConfig.preset("boss").scale());
+        assertEquals(new ScaleAxes(1.2F, 1.1F, 1.2F),
+                StatureConfig.preset("boss").shape());
+    }
+
+    @Test
+    void disabledNamesWinOverBuiltInsAndCustomOverrides() {
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "presets_custom": {"giant": 5.0},
+                  "presets_disabled": ["titan", "giant"]
+                }
+                """).getAsJsonObject(), "test");
+
+        assertEquals(7, StatureConfig.presetCount());
+        assertTrue(StatureConfig.preset("titan") == null, "a disabled built-in is still available");
+        assertTrue(StatureConfig.preset("giant") == null,
+                "a disabled name survived a custom override");
+    }
+
+    @Test
+    void builtInsCanBeSwitchedOffWhileCustomPresetsStay() {
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "presets_builtin": false,
+                  "presets_custom": {"kaiju": 6.0}
+                }
+                """).getAsJsonObject(), "test");
+
+        assertEquals(1, StatureConfig.presetCount());
+        assertTrue(StatureConfig.preset("giant") == null);
+        assertEquals(6.0F, StatureConfig.preset("kaiju").scale());
+    }
+
+    @Test
+    void badPresetEntriesAreSkipped() {
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "presets_custom": {
+                    "too_high": 100.0,
+                    "bad_shape_length": {"shape": [1.0, 2.0]},
+                    "bad_axis": {"shape": [1.0, 100.0, 1.0]},
+                    "bad_type": true,
+                    "empty": {},
+                    "good": 2.0
+                  }
+                }
+                """).getAsJsonObject(), "test");
+
+        assertEquals(10, StatureConfig.presetCount());
+        assertEquals(2.0F, StatureConfig.preset("good").scale());
+        for (String bad : new String[]{
+                "too_high", "bad_shape_length", "bad_axis", "bad_type", "empty"}) {
+            assertTrue(StatureConfig.preset(bad) == null, bad + " was not skipped");
+        }
+    }
+
+    @Test
+    void presetAndSelfSwitchesLoad() {
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "presets_enabled": false,
+                  "relative_commands_enabled": false,
+                  "self_shortcuts_enabled": false,
+                  "self_command_permission_level": 0
+                }
+                """).getAsJsonObject(), "test");
+
+        assertFalse(StatureConfig.presetsEnabled());
+        assertFalse(StatureConfig.relativeCommandsEnabled());
+        assertFalse(StatureConfig.selfShortcutsEnabled());
+        assertEquals(0, StatureConfig.selfCommandPermissionLevel());
+    }
+
+    @Test
+    void anOutOfRangeSelfPermissionKeepsThePreviousLevel() {
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"self_command_permission_level\": 7}").getAsJsonObject(), "test");
+        assertEquals(2, StatureConfig.selfCommandPermissionLevel());
+    }
+
+    @Test
+    void aMalformedOrEmptyBoxLeavesThePreviousPresetList() {
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"presets_custom\": {\"kaiju\": 6.0}}").getAsJsonObject(), "test");
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"presets_custom\": []}").getAsJsonObject(), "test");
+        assertEquals(6.0F, StatureConfig.preset("kaiju").scale(),
+                "a malformed presets_custom replaced the previous list");
     }
 }

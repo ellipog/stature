@@ -1,16 +1,22 @@
 package dev.ellipog.stature.common;
 
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import dev.ellipog.armature.api.config.ArmatureConfig;
 import dev.ellipog.armature.api.data.DataProblem;
 
+import dev.ellipog.stature.api.ScaleAxes;
+import dev.ellipog.stature.api.ScaleLimits;
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
@@ -80,7 +86,14 @@ public final class StatureConfig {
               "drops_scale": true,
               "drops_scale_strength": 1.0,
               "drops_scale_min": 1.0,
-              "drops_scale_max": 3.0
+              "drops_scale_max": 3.0,
+              "presets_enabled": true,
+              "presets_builtin": true,
+              "presets_disabled": [],
+              "presets_custom": {},
+              "relative_commands_enabled": true,
+              "self_shortcuts_enabled": true,
+              "self_command_permission_level": 2
             }
             """;
 
@@ -175,6 +188,59 @@ public final class StatureConfig {
     /** Inclusive bounds for one numeric tuning key. */
     private record Bound(float min, float max) {
     }
+
+    /** Preset names are one Brigadier word, so keep them to the characters a word accepts. */
+    private static final Pattern PRESET_NAME = Pattern.compile("[A-Za-z0-9_.+-]{1,32}");
+
+    /**
+     * One named size or shape the {@code /stature preset} command can apply.
+     *
+     * <p>At least one of {@code scale} and {@code shape} is present. A preset with both applies
+     * them in one size change, so the box does not visibly jump through an intermediate shape.
+     */
+    public record Preset(String name, @Nullable Float scale, @Nullable ScaleAxes shape) {
+
+        public Preset {
+            if (scale == null && shape == null) {
+                throw new IllegalArgumentException("preset " + name + " has neither a scale nor a shape");
+            }
+            if (scale != null && (!Float.isFinite(scale)
+                    || scale < ScaleLimits.MIN || scale > ScaleLimits.MAX)) {
+                throw new IllegalArgumentException("preset " + name + " scale is outside the normal envelope");
+            }
+        }
+
+        /** Whether this preset changes the uniform scale. */
+        public boolean hasScale() {
+            return scale != null;
+        }
+
+        /** Whether this preset changes the box's proportions. */
+        public boolean hasShape() {
+            return shape != null;
+        }
+    }
+
+    /** The presets every install starts with, in the order {@code preset list} shows them. */
+    private static final Map<String, Preset> BUILTIN_PRESETS = builtInPresets();
+
+    private static final Map<String, Preset> CUSTOM_PRESETS = new LinkedHashMap<>();
+
+    /** Names removed after the custom entries are merged, so it can disable an override too. */
+    private static final Set<String> DISABLED_PRESETS = new LinkedHashSet<>();
+
+    /** What the command can actually use right now. */
+    private static final Map<String, Preset> PRESETS = new LinkedHashMap<>(BUILTIN_PRESETS);
+
+    private static boolean presetsEnabled = true;
+
+    private static boolean presetsBuiltin = true;
+
+    private static boolean relativeCommandsEnabled = true;
+
+    private static boolean selfShortcutsEnabled = true;
+
+    private static int selfCommandPermissionLevel = 2;
 
     private static final Map<String, Bound> BOUNDS = Map.ofEntries(
             Map.entry("projectile_scale_strength", new Bound(0.0F, 4.0F)),
@@ -354,6 +420,41 @@ public final class StatureConfig {
     /** The known mechanic flag keys, in file order. */
     public static synchronized Set<String> flagKeys() {
         return Set.copyOf(FLAGS.keySet());
+    }
+
+    /** Whether {@code /stature preset} is available. Off means the command explains the switch. */
+    public static synchronized boolean presetsEnabled() {
+        return presetsEnabled;
+    }
+
+    /** Every preset the command can use, in built-in-then-custom order. */
+    public static synchronized List<Preset> presets() {
+        return List.copyOf(PRESETS.values());
+    }
+
+    /** One preset by name, or null when it is absent or disabled. */
+    public static synchronized @Nullable Preset preset(String name) {
+        return PRESETS.get(name);
+    }
+
+    /** How many presets the command can use, for the reload report. */
+    public static synchronized int presetCount() {
+        return PRESETS.size();
+    }
+
+    /** Whether the relative {@code grow} and {@code shrink} commands are registered. */
+    public static synchronized boolean relativeCommandsEnabled() {
+        return relativeCommandsEnabled;
+    }
+
+    /** Whether target-less self shortcuts are available. */
+    public static synchronized boolean selfShortcutsEnabled() {
+        return selfShortcutsEnabled;
+    }
+
+    /** The permission level the self-only commands ask for (0 to 4). */
+    public static synchronized int selfCommandPermissionLevel() {
+        return selfCommandPermissionLevel;
     }
 
     /** Whether this mechanic runs for this entity: its frame may override the file. */
@@ -617,6 +718,7 @@ public final class StatureConfig {
         for (String key : FLAGS.keySet()) {
             values.bool(key).ifPresent(value -> FLAGS.put(key, value));
         }
+        readPresetSettings(values, source);
 
         Set<String> known = new LinkedHashSet<>(FLAGS.keySet());
         known.addAll(TUNING.keySet());
@@ -624,6 +726,13 @@ public final class StatureConfig {
         known.add("macro_threshold");
         known.add("trample_max_per_scan");
         known.add("trample_drops");
+        known.add("presets_enabled");
+        known.add("presets_builtin");
+        known.add("presets_disabled");
+        known.add("presets_custom");
+        known.add("relative_commands_enabled");
+        known.add("self_shortcuts_enabled");
+        known.add("self_command_permission_level");
         // "comment" is the one key earlier versions wrote into their own default file. It is
         // accepted and ignored rather than reported, so an existing config does not log an
         // unknown-key line on every start.
@@ -644,6 +753,191 @@ public final class StatureConfig {
         } else {
             LOG.warn("config {} has a tuning minimum above its maximum; keeping the previous tuning", source);
         }
+    }
+
+    /** Reads the preset switches and definitions, keeping the previous ones on a bad shape. */
+    private static void readPresetSettings(ArmatureConfig.Values values, String source) {
+        values.bool("presets_enabled").ifPresent(value -> presetsEnabled = value);
+        values.bool("presets_builtin").ifPresent(value -> presetsBuiltin = value);
+        values.bool("relative_commands_enabled").ifPresent(value -> relativeCommandsEnabled = value);
+        values.bool("self_shortcuts_enabled").ifPresent(value -> selfShortcutsEnabled = value);
+        values.integer("self_command_permission_level", 0, 4)
+                .ifPresent(value -> selfCommandPermissionLevel = value);
+
+        values.raw("presets_disabled").ifPresent(element -> readDisabledPresets(element, source));
+        values.raw("presets_custom").ifPresent(element -> readCustomPresets(element, source));
+        rebuildPresets();
+    }
+
+    private static void readDisabledPresets(JsonElement element, String source) {
+        if (!element.isJsonArray()) {
+            LOG.warn("config {}: presets_disabled must be a list of preset names; keeping the previous list",
+                    source);
+            return;
+        }
+        Set<String> next = new LinkedHashSet<>();
+        for (JsonElement entry : element.getAsJsonArray()) {
+            if (!entry.isJsonPrimitive() || !entry.getAsJsonPrimitive().isString()) {
+                LOG.warn("config {}: skipping presets_disabled entry {}: expected a preset name",
+                        source, entry);
+                continue;
+            }
+            String name = entry.getAsString();
+            if (!PRESET_NAME.matcher(name).matches()) {
+                LOG.warn("config {}: skipping presets_disabled entry \"{}\": a preset name is one word "
+                        + "of 1 to 32 letters, digits, dots, plus signs, hyphens or underscores", source, name);
+                continue;
+            }
+            next.add(name);
+        }
+        DISABLED_PRESETS.clear();
+        DISABLED_PRESETS.addAll(next);
+    }
+
+    private static void readCustomPresets(JsonElement element, String source) {
+        if (!element.isJsonObject()) {
+            LOG.warn("config {}: presets_custom must be an object of preset names to definitions; "
+                    + "keeping the previous presets", source);
+            return;
+        }
+        Map<String, Preset> next = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+            String name = entry.getKey();
+            if (!PRESET_NAME.matcher(name).matches()) {
+                LOG.warn("config {}: skipping preset \"{}\": a preset name is one word of 1 to 32 "
+                        + "letters, digits, dots, plus signs, hyphens or underscores", source, name);
+                continue;
+            }
+            Preset preset = readPreset(source, name, entry.getValue());
+            if (preset != null) {
+                next.put(name, preset);
+            }
+        }
+        CUSTOM_PRESETS.clear();
+        CUSTOM_PRESETS.putAll(next);
+    }
+
+    /**
+     * One custom preset. A bare number is the shortest form of a size preset; an object may carry
+     * {@code scale}, {@code shape} (three multipliers in width, height, depth order), or both.
+     */
+    private static @Nullable Preset readPreset(String source, String name, JsonElement element) {
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
+            return scalePreset(source, name, element.getAsFloat());
+        }
+        if (!element.isJsonObject()) {
+            LOG.warn("config {}: skipping preset \"{}\": expected a number, or an object with "
+                    + "\"scale\" and/or \"shape\"", source, name);
+            return null;
+        }
+
+        JsonObject object = element.getAsJsonObject();
+        Float scale = null;
+        ScaleAxes shape = null;
+
+        if (object.has("scale")) {
+            JsonElement value = object.get("scale");
+            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+                LOG.warn("config {}: skipping preset \"{}\": \"scale\" must be a number", source, name);
+                return null;
+            }
+            scale = value.getAsFloat();
+            if (!validPresetScale(scale)) {
+                LOG.warn("config {}: skipping preset \"{}\": \"scale\" must be between {} and {}; "
+                                + "use a frame or /stature set --dangerous for sizes outside it",
+                        source, name, ScaleLimits.MIN, ScaleLimits.MAX);
+                return null;
+            }
+        }
+
+        if (object.has("shape")) {
+            JsonElement value = object.get("shape");
+            if (!value.isJsonArray() || value.getAsJsonArray().size() != 3) {
+                LOG.warn("config {}: skipping preset \"{}\": \"shape\" must be three numbers in "
+                        + "width, height, depth order", source, name);
+                return null;
+            }
+            float[] axis = new float[3];
+            for (int i = 0; i < 3; i++) {
+                JsonElement number = value.getAsJsonArray().get(i);
+                if (!number.isJsonPrimitive() || !number.getAsJsonPrimitive().isNumber()) {
+                    LOG.warn("config {}: skipping preset \"{}\": \"shape\" entry {} must be a number",
+                            source, name, i + 1);
+                    return null;
+                }
+                axis[i] = number.getAsFloat();
+                if (!validPresetScale(axis[i])) {
+                    LOG.warn("config {}: skipping preset \"{}\": \"shape\" entry {} must be between {} and {}",
+                            source, name, i + 1, ScaleLimits.MIN, ScaleLimits.MAX);
+                    return null;
+                }
+            }
+            try {
+                shape = new ScaleAxes(axis[0], axis[1], axis[2]);
+            } catch (IllegalArgumentException bad) {
+                LOG.warn("config {}: skipping preset \"{}\": {}", source, name, bad.getMessage());
+                return null;
+            }
+        }
+
+        for (String key : object.keySet()) {
+            if (!key.equals("scale") && !key.equals("shape")) {
+                LOG.info("config {}: ignoring unknown field \"{}\" in preset \"{}\"", source, key, name);
+            }
+        }
+
+        if (scale == null && shape == null) {
+            LOG.warn("config {}: skipping preset \"{}\": give it a \"scale\", a \"shape\" or both",
+                    source, name);
+            return null;
+        }
+        return new Preset(name, scale, shape);
+    }
+
+    private static @Nullable Preset scalePreset(String source, String name, float scale) {
+        if (!validPresetScale(scale)) {
+            LOG.warn("config {}: skipping preset \"{}\": scale {} must be between {} and {}",
+                    source, name, scale, ScaleLimits.MIN, ScaleLimits.MAX);
+            return null;
+        }
+        return new Preset(name, scale, null);
+    }
+
+    private static boolean validPresetScale(float value) {
+        return Float.isFinite(value) && value >= ScaleLimits.MIN && value <= ScaleLimits.MAX;
+    }
+
+    /**
+     * Rebuilds the usable map: built-ins first, then custom entries (which override a built-in of
+     * the same name), then the disabled list, which wins over both.
+     */
+    private static void rebuildPresets() {
+        PRESETS.clear();
+        if (presetsBuiltin) {
+            PRESETS.putAll(BUILTIN_PRESETS);
+        }
+        PRESETS.putAll(CUSTOM_PRESETS);
+        for (String name : DISABLED_PRESETS) {
+            PRESETS.remove(name);
+            if (!BUILTIN_PRESETS.containsKey(name) && !CUSTOM_PRESETS.containsKey(name)) {
+                LOG.info("presets_disabled names \"{}\", which is not a preset", name);
+            }
+        }
+    }
+
+    /** The shipped presets. Sizes first, then the three shape multipliers. */
+    private static Map<String, Preset> builtInPresets() {
+        Map<String, Preset> presets = new LinkedHashMap<>();
+        presets.put("tiny", new Preset("tiny", 0.25F, null));
+        presets.put("small", new Preset("small", 0.5F, null));
+        presets.put("normal", new Preset("normal", 1.0F, null));
+        presets.put("big", new Preset("big", 2.0F, null));
+        presets.put("giant", new Preset("giant", 4.0F, null));
+        presets.put("titan", new Preset("titan", 8.0F, null));
+        presets.put("tall", new Preset("tall", null, new ScaleAxes(0.75F, 1.5F, 0.75F)));
+        presets.put("slim", new Preset("slim", null, new ScaleAxes(0.6F, 1.0F, 0.6F)));
+        presets.put("wide", new Preset("wide", null, new ScaleAxes(1.75F, 0.75F, 1.75F)));
+        return Collections.unmodifiableMap(presets);
     }
 
     /** Whether one number is finite and within its declared bounds. */

@@ -51,7 +51,14 @@ The server creates the file with its defaults on first start. It is re-read by
   "drops_scale": true,
   "drops_scale_strength": 1.0,
   "drops_scale_min": 1.0,
-  "drops_scale_max": 3.0
+  "drops_scale_max": 3.0,
+  "presets_enabled": true,
+  "presets_builtin": true,
+  "presets_disabled": [],
+  "presets_custom": {},
+  "relative_commands_enabled": true,
+  "self_shortcuts_enabled": true,
+  "self_command_permission_level": 2
 }
 ```
 
@@ -89,10 +96,65 @@ The server creates the file with its defaults on first start. It is re-read by
 | `drops_scale_strength` | 1.0 | Multiplier on the followed drops factor. 0 to 4 |
 | `drops_scale_min` | 1.0 | Lower clamp on the drops factor. 1.0 means never less than vanilla |
 | `drops_scale_max` | 3.0 | Upper clamp on the drops factor. At least the minimum |
+| `presets_enabled` | true | Whether `/stature preset` and `/stature preset list` work |
+| `presets_builtin` | true | Whether the shipped presets are available |
+| `presets_disabled` | [] | Names removed after the built-ins and custom entries are merged |
+| `presets_custom` | {} | Custom presets, and replacements for built-ins with the same name |
+| `relative_commands_enabled` | true | Whether `/stature grow` and `/stature shrink` work |
+| `self_shortcuts_enabled` | true | Whether the target-less self forms are available |
+| `self_command_permission_level` | 2 | Permission level for the self-only forms, from 0 to 4 |
 
 The five physical extras share one [[channel-tuning|tuning family]]: an on/off flag, a strength
 multiplier and min/max clamps. The strength applies only to the followed value, while the clamps
 apply to an explicit override too, because they are a hitbox and explosion safety bound.
+
+## Presets and relative commands
+
+Presets are named sizes and shapes for `/stature preset`. The built-ins are `tiny` (0.25x), `small`
+(0.5x), `normal` (1x), `big` (2x), `giant` (4x), `titan` (8x), and the shape presets `tall`
+(0.75 x 1.5 x 0.75), `slim` (0.6 x 1.0 x 0.6) and `wide` (1.75 x 0.75 x 1.75). A size preset
+changes only the uniform scale and keeps the current shape. A shape preset changes only the box
+multipliers and keeps the current scale.
+
+Custom entries live under `presets_custom`, keyed by the name the command takes. A bare number is
+the short form of a size preset; an object may carry `scale`, `shape` or both:
+
+```json
+"presets_custom": {
+  "kaiju": 6.0,
+  "lanky": {"shape": [0.7, 1.4, 0.7]},
+  "boss": {"scale": 3.0, "shape": [1.2, 1.1, 1.2]}
+}
+```
+
+`scale` and each `shape` multiplier must be between 0.0625 and 16. A name is one word of 1 to 32
+letters, digits, dots, plus signs, hyphens or underscores. The three shape numbers are width,
+height and depth multipliers, in the same order as `/stature size`. An entry with an out-of-range
+number, a shape that is not exactly three numbers, or neither a size nor a shape is logged and
+skipped; it never stops the server and never removes the other entries. Unknown fields inside an
+entry are logged and ignored.
+
+The merged list is built in this order:
+
+1. The built-ins, when `presets_builtin` is true.
+2. Every `presets_custom` entry. A name that already exists replaces the built-in value.
+3. `presets_disabled`, which removes names from the result. It wins over both the built-ins and a
+   custom entry with the same name.
+
+`presets_enabled` false switches the whole feature off. With it off, the command refuses with a
+message naming the key, rather than disappearing without explanation. With `presets_builtin` false,
+custom presets still work.
+
+`relative_commands_enabled` false removes `/stature grow` and `/stature shrink`.
+`self_shortcuts_enabled` false turns off the target-less `set --self`, `preset --self`, `reset` and
+target-less `grow`/`shrink` forms; the target forms stay. The self forms ask for
+`self_command_permission_level`, default 2. That level can be lowered without lowering the level-2
+gate on every command that changes another entity. The level applies only to the self forms,
+including `get` with no target and `preset list`, not to `get <target>`, `reload`, `frame list` or
+the other target forms.
+
+All of these keys are read by `/stature reload`, so a preset edit and a switch change need that
+command. Vanilla `/reload` does not re-read the config file.
 
 `comment` is accepted and ignored so an older default file does not log an unknown key. Any other
 unknown key is logged and skipped. A malformed file is reported and the previous values are kept.
