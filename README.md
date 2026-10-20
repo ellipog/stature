@@ -78,9 +78,11 @@ be narrower than it is tall or deeper than it is wide.
 ```
 
 The scale itself rides the game's own `scale` attribute, so pathfinding, collision and camera
-height come with it. Everything a scale should drag along -- reach, step, motion, damage, hearts
-and thirty-odd friends -- is a channel: unset, each follows the base scale by its own exponent
+height come with it. What a scale should drag along -- reach, step, motion, jump, flight and
+safe landing -- is a channel: unset, each follows the base scale by its own exponent
 (motion goes with the square root, reach goes linear); set, it reads exactly what it says.
+Combat, defence, health, AI ranges and physics constants stay vanilla unless overridden, so
+a giant hits no harder and slides no stranger than its size already implies.
 Attribute channels apply as transient modifiers onto the entity's own base, never by replacing
 it, so a zombie's 0.23 speed and a modded creature's custom reach both survive being scaled, and
 removing the modifier restores pristine behavior with nothing stored anywhere.
@@ -102,7 +104,9 @@ cannot be the width used twice.
 
 ## Channels
 
-Forty-four named things a scale can drive, each following the base unless overridden:
+Forty-four named things a scale can drive. Body-physics channels (reach, step, motion,
+jump, flight, safe landing) follow the base unless overridden; combat, defence, health, AI
+ranges, physics constants and already-scaled render values stay off unless overridden:
 
 ```cmd
 /stature channel <targets> list                       what each channel says
@@ -115,8 +119,10 @@ Forty-four named things a scale can drive, each following the base unless overri
 /stature channel @e[type=minecraft:zombie,limit=1] list
 ```
 
-shows `motion` at 1.414 with everything linear at 2.000, and the zombie's speed attribute reads
-0.325: its own 0.23 base times the root of two, not a replaced number. Overrides are absolute --
+shows `motion` at 1.414 with reach and step linear at 2.000, and the zombie's speed attribute reads
+0.325: its own 0.23 base times the root of two, not a replaced number. Attack, health, armor,
+gravity, friction and the rest read vanilla until overridden. Overrides are absolute relative
+to the entity's own base --
 `motion 2.0` means a speed of 2.0 -- eased when set through the API, saved with the entity, and
 synced to viewers. Entries the operator set carry an `(override)` mark in the list. Mods declare their own channels through `ChannelRegistry`; anything outside
 `stature:` ships experimental, so the surface can grow without freezing a bad idea.
@@ -124,8 +130,11 @@ synced to viewers. Entries the operator set carry an `(override)` mark in the li
 Beyond attributes: knockback taken and dealt scale at the hit (giants shrug, coblyns fly),
 `visibility` hides model, plate and shadow together through one dispatcher gate, `held_item`
 and `shadow` bend just their layer, and `voice_pitch` resolves today for the voice mod that
-reads it tomorrow. Third-person distance needs no channel of its own: the camera already reads
-the `camera_distance` attribute, so it follows for free.
+reads it tomorrow. Third-person distance needs no follow of its own: vanilla already scales
+the camera distance with `minecraft:scale`, so the `camera_distance` channel stays off unless
+an override bends it further. `below_name_distance` drives the below-name visibility distance
+(renamed from `name_tag_height` in M1; old saves still load); name-tag height itself already
+follows the box.
 
 ## Per-part scaling
 

@@ -91,9 +91,19 @@ public final class ChannelService {
             Map.entry("stature:air_drag", Attributes.AIR_DRAG_MODIFIER),
             Map.entry("stature:camera_distance", Attributes.CAMERA_DISTANCE),
             Map.entry("stature:name_tag_distance", Attributes.NAME_TAG_DISTANCE),
-            Map.entry("stature:name_tag_height", Attributes.BELOW_NAME_DISTANCE));
+            Map.entry("stature:below_name_distance", Attributes.BELOW_NAME_DISTANCE));
 
     private static final String KEY_CHANNELS = "stature_channels";
+
+    /**
+     * The pre-M1 id for {@code stature:below_name_distance}. Saved overrides under the old id
+     * load onto the new channel, so a world written before the rename keeps its value.
+     */
+    static final String LEGACY_NAME_TAG_HEIGHT = "stature:name_tag_height";
+
+    /** Whether the rename alias above has been logged: the note fires once, not per entity. */
+    private static final java.util.concurrent.atomic.AtomicBoolean LEGACY_ALIAS_LOGGED =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     private ChannelService() {
     }
@@ -342,6 +352,13 @@ public final class ChannelService {
             seen[0] = true;
             String id = child.getString("id").orElse(null);
             float value = child.getFloatOr("value", Float.NaN);
+            if (LEGACY_NAME_TAG_HEIGHT.equals(id)) {
+                if (LEGACY_ALIAS_LOGGED.compareAndSet(false, true)) {
+                    LOG.info("loading a saved stature:name_tag_height override as "
+                            + "stature:below_name_distance (renamed in M1)");
+                }
+                id = "stature:below_name_distance";
+            }
             if (id == null || registry.get(id) == null) {
                 LOG.warn("ignoring a saved channel nobody declared ({}); it stays off", id);
                 return;

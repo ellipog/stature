@@ -37,42 +37,52 @@ public final class ChannelRegistry {
     }
 
     public ChannelRegistry() {
+        // Taxonomy (improvement plan M1): body-physics channels follow the base scale with a
+        // tuned exponent, so reach, step, motion, jump and safe landing feel proportional.
+        // Combat, defence, health, AI ranges and physics constants are override-only
+        // (ChannelFollow.NONE, Pehkui parity): vanilla already scales what needs scaling,
+        // and following the base here would double-apply it or clamp it into nonsense.
         registerBuiltIn(new ChannelSpec("stature:reach_block", ChannelFollow.BASE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:reach_entity", ChannelFollow.BASE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:step_height", ChannelFollow.BASE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:motion", ChannelFollow.BASE, 0.5, false));
         registerBuiltIn(new ChannelSpec("stature:jump", ChannelFollow.BASE, 0.5, false));
-        registerBuiltIn(new ChannelSpec("stature:mining_speed", ChannelFollow.BASE, 0.5, false));
-        registerBuiltIn(new ChannelSpec("stature:submerged_mining_speed", ChannelFollow.BASE, 0.5, false));
-        registerBuiltIn(new ChannelSpec("stature:mining_efficiency", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:attack", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:attack_speed", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:attack_knockback", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:sweeping_damage", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:defense", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:armor_toughness", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:knockback_resistance", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:explosion_knockback_resistance", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:health", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:absorption", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:luck", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:oxygen_bonus", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:follow_range", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:tempt_range", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:movement_efficiency", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:water_movement_efficiency", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:sneaking_speed", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:flying_speed", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:gravity", ChannelFollow.BASE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:mining_speed", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:submerged_mining_speed", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:mining_efficiency", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:attack", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:attack_speed", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:attack_knockback", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:sweeping_damage", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:defense", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:armor_toughness", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:knockback_resistance", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:explosion_knockback_resistance", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:health", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:absorption", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:luck", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:oxygen_bonus", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:follow_range", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:tempt_range", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:movement_efficiency", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:water_movement_efficiency", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:sneaking_speed", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:flying_speed", ChannelFollow.BASE, 0.5, false));
+        registerBuiltIn(new ChannelSpec("stature:gravity", ChannelFollow.NONE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:safe_fall_distance", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:fall_damage", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:burning_time", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:bounciness", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:friction", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:air_drag", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:camera_distance", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:name_tag_distance", ChannelFollow.BASE, 1.0, false));
-        registerBuiltIn(new ChannelSpec("stature:name_tag_height", ChannelFollow.BASE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:fall_damage", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:burning_time", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:bounciness", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:friction", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:air_drag", ChannelFollow.NONE, 1.0, false));
+        // Vanilla already multiplies CAMERA_DISTANCE by the living scale, so following here
+        // would square it; the channel only bends the distance further via an override.
+        registerBuiltIn(new ChannelSpec("stature:camera_distance", ChannelFollow.NONE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:name_tag_distance", ChannelFollow.NONE, 1.0, false));
+        // Below-name visibility distance, not a height: name-tag height already follows the
+        // box through vanilla's EntityAttachment.NAME_TAG. Renamed from stature:name_tag_height
+        // in M1; the old id still loads as an alias (see ChannelService.load).
+        registerBuiltIn(new ChannelSpec("stature:below_name_distance", ChannelFollow.NONE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:model", ChannelFollow.BASE, 1.0, false));
         // No sane default follows anything: hunger drain is per-action, so this one stays off
         // until set rather than deriving a rate from the scale.

@@ -32,7 +32,7 @@ class ChannelRegistryTest {
                 "stature:water_movement_efficiency", "stature:sneaking_speed", "stature:flying_speed",
                 "stature:gravity", "stature:safe_fall_distance", "stature:fall_damage",
                 "stature:burning_time", "stature:bounciness", "stature:friction", "stature:air_drag",
-                "stature:camera_distance", "stature:name_tag_distance", "stature:name_tag_height",
+                "stature:camera_distance", "stature:name_tag_distance", "stature:below_name_distance",
                 "stature:model", "stature:saturation",
                 "stature:knockback_received", "stature:knockback_dealt", "stature:voice_pitch",
                 "stature:visibility", "stature:held_item", "stature:shadow"}) {
