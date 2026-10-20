@@ -60,7 +60,30 @@ public final class NeoForgeStatureGameTests {
             new TestCase("foreign_scale_modifier_no_drift",
                     StatureGameTests::foreignScaleModifierNoDrift),
             new TestCase("api_grows_zombie_and_fires_scale_changed",
-                    StatureGameTests::apiGrowsZombieAndFiresScaleChanged));
+                    StatureGameTests::apiGrowsZombieAndFiresScaleChanged),
+            new TestCase("projectile_scale_inherits_shooter",
+                    StatureGameTests::projectileScaleInheritsShooter),
+            new TestCase("projectile_scale_disabled_is_vanilla",
+                    StatureGameTests::projectileScaleDisabledIsVanilla),
+            new TestCase("pickup_range_scales", StatureGameTests::pickupRangeScales),
+            new TestCase("pickup_range_disabled_is_vanilla",
+                    StatureGameTests::pickupRangeDisabledIsVanilla),
+            new TestCase("scale_selector_option_filters_by_scale",
+                    StatureGameTests::scaleSelectorOptionFiltersByScale),
+            new TestCase("riding_offset_follows_scale_and_disables",
+                    StatureGameTests::ridingOffsetFollowsScaleAndDisables),
+            new TestCase("explosion_scale_reaches_further",
+                    StatureGameTests::explosionScaleReachesFurther),
+            new TestCase("explosion_scale_disabled_is_vanilla",
+                    StatureGameTests::explosionScaleDisabledIsVanilla),
+            new TestCase("drops_scale_multiplies_loot_counts",
+                    StatureGameTests::dropsScaleMultipliesLootCounts),
+            new TestCase("drops_scale_disabled_is_vanilla",
+                    StatureGameTests::dropsScaleDisabledIsVanilla),
+            new TestCase("near_one_with_frame_tier_still_runs",
+                    StatureGameTests::nearOneWithFrameTierStillRuns),
+            new TestCase("frame_cache_and_channels_stay_consistent",
+                    StatureGameTests::frameCacheAndChannelsStayConsistent));
 
     private static final DeferredRegister<Consumer<GameTestHelper>> FUNCTIONS =
             DeferredRegister.create(Registries.TEST_FUNCTION, Stature.MOD_ID);

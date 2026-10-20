@@ -21,8 +21,9 @@ Stature has not been released yet. This section covers everything on `master` so
   viewers.
 - Hurt regions on frames: a rig group, a damage multiplier and a tag, resolved from projectile
   impact points or a validated melee view ray.
-- Forty-three built-in channels for reach, step, motion, jump, flight, safe fall, combat, defence,
-  health, AI ranges, physics constants, knockback, saturation and rendering.
+- Forty-eight built-in channels for reach, step, motion, jump, flight, safe fall, combat, defence,
+  health, AI ranges, physics constants, knockback, saturation, rendering, projectiles, pickup
+  reach, riding offsets, explosions and drops.
 - `config/stature.json` with micro and macro edges and flags for porous traversal, surface
   climbing, amplified knockback, trampling, seismic footsteps and doorway compression.
 - Trampling that respects claims, spawn protection and mob griefing, with a per-scan cap and an
@@ -37,6 +38,24 @@ Stature has not been released yet. This section covers everything on `master` so
   shapes, channel overrides and integration frames, and `StatureEvents` reports scale, frame,
   channel and threshold-tier changes with a cause. The `stature-api` artifact stays pure Java value
   types; everything outside the facade package is internal.
+- Five M10 channels, each with a config switch, strength and min/max clamps, per-entity overrides
+  and frame support: `projectile_scale`, `item_pickup_range`, `riding_offset`, `explosion_scale`
+  and `drops_scale`.
+- Projectiles fired by a scaled entity inherit its size, hitbox, damage and launch speed. The size
+  is saved with the projectile and the damage is applied once at the hurt funnel.
+- Item and experience pickup scans use the scaled reach of `item_pickup_range`.
+- Mounts can tune the scale handed to their rider attachment with `riding_offset`.
+- Explosions caused by a living entity or by TNT it primed scale their radius with
+  `explosion_scale`; unattributed explosions stay vanilla.
+- Loot-table drops from a scaled entity multiply their stack counts with `drops_scale`. Only
+  stackable items scale, counts never fall below vanilla, and equipment is untouched.
+- The `stature:scale` entity-selector option, using vanilla range syntax such as
+  `@e[stature:scale=0.5..2]`, on both loaders.
+- Frames can set any declared channel through a `channels` object, and clear the overrides they
+  introduced when replaced.
+- A per-tick frame-file cache and a near-1x threshold skip. Both are behaviour-preserving: the
+  cache is keyed by tick and invalidated on a frame change or registry reload, and the threshold
+  guard still runs whenever the entity's own resolved edges put it in a tier.
 
 ### Changed
 

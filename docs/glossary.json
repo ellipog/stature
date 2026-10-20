@@ -59,6 +59,24 @@
       "term": "Dangerous size",
       "definition": "A scale outside the game's envelope. A dangerous set keeps the box at the nearest bound and draws the model at the requested size.",
       "see": ["envelope"]
+    },
+    {
+      "id": "scale-selector",
+      "term": "Scale selector",
+      "definition": "The stature:scale entity-selector option, which filters living entities by their uniform scale using vanilla range syntax, such as 0.5..2.",
+      "see": ["channel"]
+    },
+    {
+      "id": "channel-tuning",
+      "term": "Channel tuning",
+      "definition": "The server config family for a Stature-applied channel: an on/off flag, a strength multiplier and min/max clamps. Per-entity overrides and frames sit on top of it.",
+      "see": ["channel", "scale-frame"]
+    },
+    {
+      "id": "loot-scaling",
+      "term": "Loot scaling",
+      "definition": "Multiplying the count of loot-table stacks from a scaled entity. Only stackable items scale; uniques are never duplicated and equipment is untouched.",
+      "see": ["channel"]
     }
   ]
 }

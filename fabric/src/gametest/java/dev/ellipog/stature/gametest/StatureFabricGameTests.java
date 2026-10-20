@@ -86,4 +86,64 @@ public final class StatureFabricGameTests {
     public void apiGrowsZombieAndFiresScaleChanged(GameTestHelper helper) {
         StatureGameTests.apiGrowsZombieAndFiresScaleChanged(helper);
     }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 5)
+    public void projectileScaleInheritsShooter(GameTestHelper helper) {
+        StatureGameTests.projectileScaleInheritsShooter(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 5)
+    public void projectileScaleDisabledIsVanilla(GameTestHelper helper) {
+        StatureGameTests.projectileScaleDisabledIsVanilla(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void pickupRangeScales(GameTestHelper helper) {
+        StatureGameTests.pickupRangeScales(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void pickupRangeDisabledIsVanilla(GameTestHelper helper) {
+        StatureGameTests.pickupRangeDisabledIsVanilla(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void scaleSelectorOptionFiltersByScale(GameTestHelper helper) {
+        StatureGameTests.scaleSelectorOptionFiltersByScale(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void ridingOffsetFollowsScaleAndDisables(GameTestHelper helper) {
+        StatureGameTests.ridingOffsetFollowsScaleAndDisables(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void explosionScaleReachesFurther(GameTestHelper helper) {
+        StatureGameTests.explosionScaleReachesFurther(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void explosionScaleDisabledIsVanilla(GameTestHelper helper) {
+        StatureGameTests.explosionScaleDisabledIsVanilla(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void dropsScaleMultipliesLootCounts(GameTestHelper helper) {
+        StatureGameTests.dropsScaleMultipliesLootCounts(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void dropsScaleDisabledIsVanilla(GameTestHelper helper) {
+        StatureGameTests.dropsScaleDisabledIsVanilla(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void nearOneWithFrameTierStillRuns(GameTestHelper helper) {
+        StatureGameTests.nearOneWithFrameTierStillRuns(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 8)
+    public void frameCacheAndChannelsStayConsistent(GameTestHelper helper) {
+        StatureGameTests.frameCacheAndChannelsStayConsistent(helper);
+    }
 }

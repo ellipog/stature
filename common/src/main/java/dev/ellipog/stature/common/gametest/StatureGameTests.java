@@ -7,21 +7,28 @@ import java.util.Map;
 import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
+import dev.ellipog.stature.common.ExplosionScaling;
+import dev.ellipog.stature.common.ProjectileScaling;
 import dev.ellipog.stature.common.ResolvedThresholds;
+import dev.ellipog.stature.common.RidingOffset;
 import dev.ellipog.stature.common.ScaleService;
-import dev.ellipog.stature.common.api.StatureApi;
-import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureDamageTypes;
+import dev.ellipog.stature.common.StatureProjectile;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.Thresholds;
+import dev.ellipog.stature.common.api.StatureApi;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
+import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.parts.PartService;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.DamageTypeTags;
@@ -34,11 +41,20 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.equine.Horse;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.gametest.framework.GameTestHelper;
 
 /**
@@ -475,6 +491,320 @@ public final class StatureGameTests {
         scale.removeModifier(foreign);
         ScaleService.apply(zombie, ScaleState.UNIFORM);
         helper.succeed();
+    }
+
+    /**
+     * M10: an arrow fired by a 4x shooter inherits size, damage and already-scaling speed.
+     *
+     * <p>The arrow is shot but never added to the level: that keeps the assertion about the
+     * projectile itself, with no random terrain hit in between.
+     */
+    public static void projectileScaleInheritsShooter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie shooter = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        ScaleService.apply(shooter, new ScaleState(4.0F, ScaleAxes.UNIFORM));
+
+        Arrow arrow = new Arrow(level, shooter, new ItemStack(Items.ARROW), null);
+        arrow.shoot(0.0, 0.0, 1.0, 3.0F, 0.0F);
+
+        StatureProjectile duck = (StatureProjectile) arrow;
+        helper.assertValueEqual(4.0F, duck.stature$projectileScale(),
+                "the arrow did not inherit its shooter's scale");
+        helper.assertTrue(Math.abs(arrow.getBbWidth() - 2.0F) < 1e-3F,
+                "the arrow hitbox did not grow with the inherited size: " + arrow.getBbWidth());
+        helper.assertValueEqual(4.0F, ProjectileScaling.hitDamageFactor(arrow),
+                "the arrow damage multiplier did not follow the inherited size");
+        helper.assertTrue(Math.abs(arrow.getDeltaMovement().length() - 6.0) < 1e-3,
+                "the arrow launch speed did not use the configured curve: "
+                        + arrow.getDeltaMovement().length());
+        helper.succeed();
+    }
+
+    /** M10: turning projectile_scale off gives the exact vanilla arrow. */
+    public static void projectileScaleDisabledIsVanilla(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie shooter = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        ScaleService.apply(shooter, new ScaleState(4.0F, ScaleAxes.UNIFORM));
+        // The per-entity resolved flags are the sync form of the server config. Using them keeps
+        // this test independent of the other gametests running in the same batch.
+        disable(shooter, StatureConfig.PROJECTILE_SCALE);
+        Arrow arrow = new Arrow(level, shooter, new ItemStack(Items.ARROW), null);
+        arrow.shoot(0.0, 0.0, 1.0, 3.0F, 0.0F);
+        StatureProjectile duck = (StatureProjectile) arrow;
+        helper.assertValueEqual(1.0F, duck.stature$projectileScale(),
+                "a disabled projectile channel still inherited its shooter's scale");
+        helper.assertValueEqual(0.5F, arrow.getBbWidth(),
+                "a disabled projectile channel changed the arrow hitbox");
+        helper.assertValueEqual(1.0F, ProjectileScaling.hitDamageFactor(arrow),
+                "a disabled projectile channel changed arrow damage");
+        helper.assertTrue(Math.abs(arrow.getDeltaMovement().length() - 3.0) < 1e-3,
+                "a disabled projectile channel changed arrow speed");
+        helper.succeed();
+    }
+
+    /**
+     * M10: a 4x player picks up an item two blocks away, outside vanilla's one-block inflation.
+     *
+     * <p>The player's own box is only 1.2 blocks wide at that scale, so the pickup has to come
+     * from the enlarged scan area rather than from touching the item.
+     */
+    public static void pickupRangeScales(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(0, 2, 0));
+        clearVolume(level, base, 4, 2, 4);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setPos(base.getX() + 0.5, base.getY(), base.getZ() + 0.5);
+        ChannelService.setChannel(
+                player, StatureConfig.ITEM_PICKUP_RANGE_CHANNEL, 4.0F, 0, Easing.LINEAR);
+
+        ItemEntity item = new ItemEntity(level,
+                base.getX() + 3.5, base.getY(), base.getZ() + 0.5,
+                new ItemStack(Items.STONE, 2));
+        item.setNoPickUpDelay();
+        level.addFreshEntity(item);
+        try {
+            player.aiStep();
+            helper.assertTrue(item.isRemoved() || item.getItem().isEmpty(),
+                    "a 4x pickup channel did not pick up an item 3 blocks away");
+        } finally {
+            if (!item.isRemoved()) {
+                item.discard();
+            }
+            player.discard();
+        }
+        helper.succeed();
+    }
+
+    /** M10: turning item_pickup_range off restores vanilla's one-block item and XP scan. */
+    public static void pickupRangeDisabledIsVanilla(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(0, 2, 0));
+        clearVolume(level, base, 4, 2, 4);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        player.setPos(base.getX() + 0.5, base.getY(), base.getZ() + 0.5);
+        ChannelService.setChannel(
+                player, StatureConfig.ITEM_PICKUP_RANGE_CHANNEL, 4.0F, 0, Easing.LINEAR);
+        disable(player, StatureConfig.ITEM_PICKUP_RANGE);
+
+        ItemEntity item = new ItemEntity(level,
+                base.getX() + 3.5, base.getY(), base.getZ() + 0.5,
+                new ItemStack(Items.STONE, 2));
+        item.setNoPickUpDelay();
+        level.addFreshEntity(item);
+        try {
+            player.aiStep();
+            helper.assertFalse(item.isRemoved() || item.getItem().isEmpty(),
+                    "a disabled pickup channel still picked up an item outside vanilla reach");
+        } finally {
+            if (!item.isRemoved()) {
+                item.discard();
+            }
+            player.discard();
+        }
+        helper.succeed();
+    }
+
+    /** M10: the selector option filters by the uniform scale with vanilla range syntax. */
+    public static void scaleSelectorOptionFiltersByScale(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie small = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(1, 2, 1));
+        Zombie big = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(3, 2, 1));
+        small.addTag("stature.selector");
+        big.addTag("stature.selector");
+        ScaleService.apply(small, new ScaleState(0.5F, ScaleAxes.UNIFORM));
+        ScaleService.apply(big, new ScaleState(4.0F, ScaleAxes.UNIFORM));
+        try {
+            int matched = runCommand(level,
+                    "stature set @e[tag=stature.selector,stature:scale=0.5..2] 2");
+            helper.assertValueEqual(1, matched,
+                    "the scale selector did not match exactly the small zombie");
+            helper.assertValueEqual(2.0F, ScaleService.stateOf(small).scale(),
+                    "the scale selector matched the wrong entity");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(big).scale(),
+                    "the scale selector changed the entity outside its range");
+
+            int open = runCommand(level,
+                    "stature set @e[tag=stature.selector,stature:scale=2..] 3");
+            helper.assertValueEqual(2, open,
+                    "an open-ended scale range did not match both ends");
+            helper.assertValueEqual(3.0F, ScaleService.stateOf(small).scale(),
+                    "the open-ended selector missed the lower bound");
+            helper.assertValueEqual(3.0F, ScaleService.stateOf(big).scale(),
+                    "the open-ended selector missed the upper entity");
+        } finally {
+            small.removeTag("stature.selector");
+            big.removeTag("stature.selector");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * M10: the seat scale for a mount follows the configured factor and is exactly vanilla when
+     * the channel is off. This is the number vanilla hands to a horse's rider attachment.
+     */
+    public static void ridingOffsetFollowsScaleAndDisables(GameTestHelper helper) {
+        Horse horse = helper.spawnWithNoFreeWill(EntityTypes.HORSE, new BlockPos(2, 2, 2));
+        ScaleService.apply(horse, new ScaleState(2.0F, ScaleAxes.UNIFORM));
+        helper.assertValueEqual(2.0F, RidingOffset.seatScale(horse, 2.0F),
+                "the default seat scale did not match vanilla's mount scale");
+
+        ChannelService.setChannel(
+                horse, StatureConfig.RIDING_OFFSET_CHANNEL, 4.0F, 0, Easing.LINEAR);
+        helper.assertValueEqual(4.0F, RidingOffset.seatScale(horse, 2.0F),
+                "a riding_offset override did not change the seat scale");
+
+        disable(horse, StatureConfig.RIDING_OFFSET);
+        helper.assertValueEqual(2.0F, RidingOffset.seatScale(horse, 2.0F),
+                "a disabled riding_offset still changed the seat scale");
+        helper.succeed();
+    }
+
+    /**
+     * M10: a 4x entity's explosion reaches a block that vanilla's radius cannot.
+     *
+     * <p>Dirt at two blocks from the centre is outside a 1.5 explosion but inside the channel's
+     * 3.0 (a 4x source resolves to a 2.0 factor). The fixture clears the surrounding world first
+     * so terrain cannot answer for the channel.
+     */
+    public static void explosionScaleReachesFurther(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(0, 2, 0));
+        clearVolume(level, base, 8, 2, 35);
+        Zombie source = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, 0, 2, 0);
+        // 16x is the top of the box envelope; the explosion curve and its 3x clamp resolve to 3.
+        ScaleService.apply(source, new ScaleState(16.0F, ScaleAxes.UNIFORM));
+        helper.assertValueEqual(3.0F, ExplosionScaling.radius(source, 1.0F),
+                "the explosion radius did not follow the configured curve");
+
+        BlockPos target = base.offset(4, 0, 0);
+        level.setBlockAndUpdate(target, Blocks.DIRT.defaultBlockState());
+        level.explode(source, base.getX() + 0.5, base.getY() + 0.5, base.getZ() + 0.5,
+                2.0F, Level.ExplosionInteraction.TNT);
+        helper.assertTrue(level.getBlockState(target).isAir(),
+                "a scaled explosion did not reach a block outside the vanilla radius");
+        helper.succeed();
+    }
+
+    /** M10: turning explosion_scale off leaves the vanilla radius and the block standing. */
+    public static void explosionScaleDisabledIsVanilla(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(0, 2, 0));
+        clearVolume(level, base, 8, 2, 35);
+        Zombie source = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, 0, 2, 0);
+        ScaleService.apply(source, new ScaleState(16.0F, ScaleAxes.UNIFORM));
+        disable(source, StatureConfig.EXPLOSION_SCALE);
+        helper.assertValueEqual(1.0F, ExplosionScaling.radius(source, 1.0F),
+                "a disabled explosion channel changed the radius");
+        BlockPos target = base.offset(4, 0, 0);
+        level.setBlockAndUpdate(target, Blocks.DIRT.defaultBlockState());
+        level.explode(source, base.getX() + 0.5, base.getY() + 0.5, base.getZ() + 0.5,
+                2.0F, Level.ExplosionInteraction.TNT);
+        helper.assertFalse(level.getBlockState(target).isAir(),
+                "a disabled explosion channel reached outside the vanilla radius");
+        helper.succeed();
+    }
+
+    /** M10: a scaled entity's fixed loot table count grows by the configured factor. */
+    public static void dropsScaleMultipliesLootCounts(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        ScaleService.apply(zombie, new ScaleState(16.0F, ScaleAxes.UNIFORM));
+        List<ItemStack> drops = new ArrayList<>();
+        ResourceKey<LootTable> table = ResourceKey.create(
+                Registries.LOOT_TABLE,
+                Identifier.fromNamespaceAndPath("stature", "gametest_drops"));
+        zombie.dropFromLootTable(
+                level, zombie.damageSources().generic(), false, table, drops::add);
+        helper.assertValueEqual(6, count(drops),
+                "the drops channel did not multiply the fixed two-item table by the clamped 3x");
+        helper.succeed();
+    }
+
+    /** M10: turning drops_scale off leaves the loot table's exact count. */
+    public static void dropsScaleDisabledIsVanilla(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        ScaleService.apply(zombie, new ScaleState(16.0F, ScaleAxes.UNIFORM));
+        disable(zombie, StatureConfig.DROPS_SCALE);
+        List<ItemStack> drops = new ArrayList<>();
+        ResourceKey<LootTable> table = ResourceKey.create(
+                Registries.LOOT_TABLE,
+                Identifier.fromNamespaceAndPath("stature", "gametest_drops"));
+        zombie.dropFromLootTable(
+                level, zombie.damageSources().generic(), false, table, drops::add);
+        helper.assertValueEqual(2, count(drops),
+                "a disabled drops channel changed the loot table count");
+        helper.succeed();
+    }
+
+    /**
+     * M10 performance guard: a 1x entity whose own resolved edges make it macro still tramples.
+     *
+     * <p>This is the behaviour the near-1x skip must not change. The default edges would skip the
+     * scan, but this entity's resolved macro edge is 0.9, so the guard must let the mechanic run.
+     */
+    public static void nearOneWithFrameTierStillRuns(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(0, 2, 0));
+        clearVolume(level, base, 8, 2, 35);
+        fillLeaves(level, base, LEAF_RADIUS);
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, 0, 2, 0);
+        ScaleService.apply(zombie, new ScaleState(1.0F, ScaleAxes.UNIFORM));
+        ((StatureScale) zombie).stature$setThresholds(
+                new ResolvedThresholds(0.25F, 0.9F, Map.of("trampling", true)));
+        zombie.tickCount = scanTick(zombie);
+        try {
+            Thresholds.tick(zombie);
+            int broken = leafCells() - countLeaves(level, base, LEAF_RADIUS);
+            helper.assertTrue(broken > 0,
+                    "the near-1x skip suppressed a frame's macro trample tier");
+        } finally {
+            clearLeaves(level, base, LEAF_RADIUS);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * M10: the per-tick frame-file cache is keyed by tick and cleared when the frame changes.
+     *
+     * <p>It also covers the frame channel path: applying the test frame sets an ordinary channel
+     * override, and clearing the frame removes the value it introduced.
+     */
+    public static void frameCacheAndChannelsStayConsistent(GameTestHelper helper) {
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        StatureScale duck = (StatureScale) zombie;
+        Identifier id = Identifier.fromNamespaceAndPath("stature", "gametest_frame");
+        duck.stature$setFrame(id);
+        FrameFile first = FrameService.frameFileOf(zombie);
+        helper.assertTrue(first != null, "the test frame did not load");
+        helper.assertTrue(first == FrameService.frameFileOf(zombie),
+                "the frame file was not cached for the tick");
+        duck.stature$setFrame(null);
+        helper.assertTrue(FrameService.frameFileOf(zombie) == null,
+                "changing the frame left the old cached file in place");
+
+        helper.assertTrue(FrameService.apply(zombie, id, 0),
+                "the test frame could not be applied");
+        helper.assertValueEqual(2.0F, duck.stature$channelOverrides().get("stature:projectile_scale"),
+                "the frame did not set its channel");
+        FrameService.clear(zombie);
+        helper.assertFalse(duck.stature$channelOverrides().containsKey("stature:projectile_scale"),
+                "clearing the frame left its channel override behind");
+        helper.succeed();
+    }
+
+    private static int count(List<ItemStack> stacks) {
+        return stacks.stream().mapToInt(ItemStack::getCount).sum();
+    }
+
+    /**
+     * The per-entity form of a disabled config flag, exactly what a server sends when a frame or
+     * the config turns a mechanic off. Using the resolved form keeps concurrent gametests from
+     * fighting over the one global config file.
+     */
+    private static void disable(LivingEntity entity, String key) {
+        ((StatureScale) entity).stature$setThresholds(
+                new ResolvedThresholds(0.25F, 2.5F, Map.of(key, false)));
     }
 
     /** The leaf field is 13x13, big enough to contain the 16x box's foot layer. */

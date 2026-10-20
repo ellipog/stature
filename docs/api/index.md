@@ -93,6 +93,11 @@ The id must not already be taken. Ids outside the `stature` namespace are stored
 The channel table is server-side state, like the built-ins. See [[stature:channels]] for the built-in
 set and what each channel drives.
 
+The M10 physical channels need no extra API: `projectile_scale`, `item_pickup_range`,
+`riding_offset`, `explosion_scale` and `drops_scale` are ordinary channels. Read and change them
+with `channelOverride` and `setChannel` exactly like `stature:attack`. A frame declares the same
+overrides through its `channels` object, so an integration does not need a new call for them.
+
 ## Threads and events
 
 `state` and `channelOverride` are reads and may run on either side. Every mutator is server-side and
