@@ -22,9 +22,9 @@ world. The last-verified column stays blank until a person has run the row.
 .\gradlew.bat :api:test :common:test
 ```
 
-The game-free suite is 177 tests: 43 in `:api` and 134 in `:common`, before the docs coverage
-test is added. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server
-gametests because Loom wires `check` to `runGameTest`.
+The game-free suite is 179 tests: 43 in `:api` and 136 in `:common`, including the docs coverage
+test. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server gametests
+because Loom wires `check` to `runGameTest`.
 
 The tests are game-free: math, serialization, mixin contracts, and the markdown coverage check.
 Anything that needs a level, a registry or a spawned entity belongs in a gametest.
@@ -140,7 +140,7 @@ the same last-verified column.
 
 | ID | Setup | Look for | Last verified (date, loader, commit) |
 |---|---|---|---|
-| M5-1 | Two clients: A at 16×, B at 200 blocks. Walk A at 10, 50 and 200 blocks from B | B hears and feels the steps at 10 and 50, nothing at 200; the shake follows B's Screen Effect slider; B receives no footstep packet at 200 blocks | |
+| M5-1 | Two clients: A at 16×, B at 200 blocks. Walk A at 10, 40, 50 and 200 blocks from B | B hears and feels the steps at 10 and 40 (the shake reaches 48 blocks), hears but does not feel them at 50, and neither hears nor feels them at 200; the shake follows B's Screen Effect slider; B receives no footstep packet at 200 blocks | |
 | M5-2 | NeoForge dedicated server, 20 zombies at 16× walking for 60 s, then the same pen at 1× | average MSPT within ±5% of the 1× run (see the performance procedure) | |
 | M5-3 | Non-op player at 16× walking through leaves and crops inside spawn protection, then inside a claim | nothing breaks in the protected area; a claim mod's cancellation is respected; a non-op cannot trample | |
 | M5-4 | Grow 1× to 16× inside a 3-high tunnel, then inside a sealed pocket | the tunnel ends in open air with at most one compression hit and no death at full health; a truly encased giant takes compression once per second, and armour does not stop it | |

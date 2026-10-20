@@ -1,0 +1,64 @@
+{
+  "terms": [
+    {
+      "id": "channel",
+      "term": "Channel",
+      "definition": "One named number a scale can drive, such as reach or motion. Unset, it follows the base scale raised to an exponent; an override replaces it.",
+      "see": ["scale-frame"]
+    },
+    {
+      "id": "scale-frame",
+      "term": "Scale frame",
+      "definition": "A named size and shape a datapack declares for an entity, with optional part factors, hurt regions and threshold overrides. Stature ships none.",
+      "see": ["rig", "part-factor", "hurt-region"]
+    },
+    {
+      "id": "rig",
+      "term": "Rig",
+      "definition": "A named set of part groups and the model paths each group covers, loaded from a datapack. The built-in stature:humanoid rig is the fallback.",
+      "see": ["part-factor", "hurt-region"]
+    },
+    {
+      "id": "part-factor",
+      "term": "Part factor",
+      "definition": "A per-axis multiplier on one model part, or on every part a rig group covers. It changes the silhouette, not the entity's box, unless a frame sets hitbox_from_parts.",
+      "see": ["rig", "scale-frame"]
+    },
+    {
+      "id": "threshold",
+      "term": "Threshold",
+      "definition": "One of the two scale edges that decide when the micro and macro mechanics run. A frame may move either edge for its entities.",
+      "see": ["micro", "macro"]
+    },
+    {
+      "id": "micro",
+      "term": "Micro",
+      "definition": "An entity whose uniform scale is below its micro threshold. Micro entities climb walls and pass through bars, fences and bamboo when those flags are on.",
+      "see": ["threshold", "macro"]
+    },
+    {
+      "id": "macro",
+      "term": "Macro",
+      "definition": "An entity whose uniform scale is above its macro threshold. Macro entities trample fragile blocks, compress under low ceilings and make seismic footsteps when those flags are on.",
+      "see": ["threshold", "micro"]
+    },
+    {
+      "id": "hurt-region",
+      "term": "Hurt region",
+      "definition": "A part of a frame's body that takes a different damage multiplier. A region names a rig group, uses that group's fractional box and carries a tag for other mods.",
+      "see": ["rig", "scale-frame"]
+    },
+    {
+      "id": "envelope",
+      "term": "Envelope",
+      "definition": "The range the game's minecraft:scale attribute accepts, 0.0625 to 16. A size outside it needs dangerous mode.",
+      "see": ["dangerous"]
+    },
+    {
+      "id": "dangerous",
+      "term": "Dangerous size",
+      "definition": "A scale outside the game's envelope. A dangerous set keeps the box at the nearest bound and draws the model at the requested size.",
+      "see": ["envelope"]
+    }
+  ]
+}
