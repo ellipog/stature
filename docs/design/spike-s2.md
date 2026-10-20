@@ -1,6 +1,6 @@
 # Spike S2: is non-uniform (per-axis) scaling achievable on Minecraft 26.3?
 
-**Verdict: yes, and the launch roster needs only the cheaper half of it.**
+**Verdict: yes, and the intended shapes need only the cheaper half of it.**
 
 Read from the 26.3 sources this workspace builds against: the NeoForm `mergeWithSources` tree,
 class-file major 69, the one with `EntitySpawnReason` and `EntityTypes`. Every claim below names the
@@ -33,8 +33,8 @@ file and line it came from.
     LivingEntity.java:3917   protected EntityDimensions getDefaultDimensions(Pose pose) {
     LivingEntity.java:3918       return this.getType().getDimensions().scale(this.getAgeScale());
 
-So both launch kin in §14.6 (Zephyr 0.55 × 1.71, Voidstrider 0.63 × 2.10) are expressible today:
-they need `scale(0.55f, 1.71f)` where the code passes one factor. What stops a subclass doing it is
+So the two non-uniform shapes Stature is meant to carry (0.55 × 1.71 and 0.63 × 2.10) are expressible
+today: they need `scale(0.55f, 1.71f)` where the code passes one factor. What stops a subclass doing it is
 that `getDimensions` is `final`, so it takes a mixin rather than an override. One method, not a
 redesign.
 
