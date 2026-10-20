@@ -104,3 +104,6 @@ Stature has not been released yet. This section covers everything on `master` so
 - Growing into solid rock searches outward for air and hurts at most once per transition instead
   of once per eased tick.
 - A malformed config packet is rejected whole, so the client cannot apply half a threshold set.
+- The client starts with the part-pose mixin applied. Its shared helpers live in `PartPoseScope`
+  instead of as non-private static methods on a mixin, which Mixin refuses. Found by running the
+  Fabric client gametest.
