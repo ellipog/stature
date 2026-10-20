@@ -56,6 +56,23 @@ Stature has not been released yet. This section covers everything on `master` so
 - A per-tick frame-file cache and a near-1x threshold skip. Both are behaviour-preserving: the
   cache is keyed by tick and invalidated on a frame change or registry reload, and the threshold
   guard still runs whenever the entity's own resolved edges put it in a tier.
+- `/stature preset <targets> <preset> [<ticks>]`, `/stature preset --self <preset> [<ticks>]` and
+  `/stature preset list`, with built-in size presets (`tiny`, `small`, `normal`, `big`, `giant`,
+  `titan`) and shape presets (`tall`, `slim`, `wide`). Presets complete, an unknown name points at
+  `preset list`, and applying one is an explicit size choice like `set` or `size`.
+- Config-defined presets: pack makers can add their own, replace a built-in by using its name, or
+  remove names with `presets_disabled`; `presets_enabled` switches the whole feature off. Bad
+  entries are logged and skipped, and `/stature reload` picks up edits.
+- Target-less self forms: `/stature set --self`, `/stature preset --self`, `/stature get` with no
+  target, `/stature reset` and the target-less `/stature grow`/`shrink`. `--self` is used where an
+  omitted target could be read as a player name. The forms ask for
+  `self_command_permission_level` (default 2) and can be switched off with
+  `self_shortcuts_enabled`.
+- `/stature grow [<targets>] [<factor>]` and `/stature shrink [<targets>] [<factor>]`, defaulting to
+  2x and 0.5x, clamped to the normal 0.0625 to 16 envelope and switchable with
+  `relative_commands_enabled`. They reuse the existing bounds and dangerous-model cleanup.
+- Friendlier result lines: preset, grow and shrink successes say what changed and when a value was
+  held at an envelope edge.
 
 ### Changed
 
@@ -81,6 +98,9 @@ Stature has not been released yet. This section covers everything on `master` so
   model survives.
 - Scale reads and writes use the base value of `minecraft:scale`, so another mod's modifier
   multiplies on top without being folded in.
+- Permission level 2 now governs the commands that can change another entity, while the new
+  self-only forms ask for `self_command_permission_level` (default 2). The default is unchanged;
+  a pack can lower only the self forms.
 
 ### Removed
 

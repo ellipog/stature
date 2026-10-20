@@ -21,7 +21,7 @@ world. The last-verified column stays blank until a person has run the row.
 .\gradlew.bat :api:test :common:test
 ```
 
-The game-free suite is 215 tests: 43 in `:api` and 172 in `:common`, including the docs coverage
+The game-free suite is 224 tests: 43 in `:api` and 181 in `:common`, including the docs coverage
 test. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server gametests
 because Loom wires `check` to `runGameTest`.
 
@@ -63,7 +63,7 @@ Every other run, and the shipped jar, registers nothing.
 On a fresh checkout, create `neoforge/run/eula.txt` once with `eula=true` (the run directory is
 gitignored).
 
-A green run reports 25 tests on either loader: the 24 Stature bodies below plus vanilla's
+A green run reports 31 tests on either loader: the 30 Stature bodies below plus vanilla's
 `minecraft:always_pass`.
 
 ### Current coverage
@@ -94,6 +94,12 @@ A green run reports 25 tests on either loader: the 24 Stature bodies below plus 
 | `dropsScaleDisabledIsVanilla` | M10: the same table yields exactly two when disabled |
 | `nearOneWithFrameTierStillRuns` | M10 performance: the near-1x skip still runs a mechanic when the entity's resolved macro edge is 0.9 |
 | `frameCacheAndChannelsStayConsistent` | M10: the per-tick frame cache invalidates on a frame change, and frame channels are applied and removed with the frame |
+| `builtInPresetsApply` | A built-in size preset applies 4x, a shape preset applies three multipliers without moving the scale, a size preset keeps the shape, and an unknown name changes nothing |
+| `configPresetsAddAndOverride` | A config-defined size preset, a custom override of a built-in, and a preset carrying both scale and shape |
+| `disabledPresetsAreUnavailable` | `presets_enabled` off refuses apply and list; `presets_builtin` off hides built-ins while a custom preset still runs |
+| `selfShortcutsUseTheCommandEntity` | `set --self`, `preset --self`, target-less `get`, target-less `grow`, `shrink --self` and `reset` act on the source player; the old target forms still work; a console self form fails cleanly; a lowered self permission level opens the self forms but not the target forms |
+| `growAndShrinkClampToTheNormalEnvelope` | Grow doubles, a factor multiplies, both ends clamp, and a grow clears a dangerous model |
+| `oldCommandSyntaxStillWorks` | `set` (plain, eased and both `--dangerous` spellings), `size`, `channel`, `part`, `frame apply`, `frame clear`, `get` and `reset` still parse and run |
 
 ### Structures
 
