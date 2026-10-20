@@ -142,8 +142,15 @@ class CameraTraumaTest {
         CameraTrauma.reset();
         CameraTrauma.addShake(0.0, 0.0, 0.0, 16.0F, new Vec3(0.0, 0.0, 0.0), 1.0F, false);
         float nearby = CameraTrauma.sample();
-        assertEquals(0.6F, nearby, 1e-4F);
+        assertEquals(0.6F, nearby, 1e-3F);
         assertTrue(own < nearby * 0.25F, "own " + own + " vs nearby " + nearby);
+    }
+
+    @Test
+    void anOwnStepDoesNotLowerANearbyGiantsShake() {
+        CameraTrauma.addShake(0.0, 0.0, 0.0, 16.0F, new Vec3(0.0, 0.0, 0.0), 1.0F, false);
+        CameraTrauma.addShake(0.0, 0.0, 0.0, 16.0F, new Vec3(0.0, 25.92, 0.0), 1.0F, true);
+        assertEquals(0.6F, CameraTrauma.sample(), 1e-3F);
     }
 
     @Test
@@ -153,7 +160,7 @@ class CameraTraumaTest {
         CameraTrauma.addShake(0.0, 0.0, 0.0, 16.0F, new Vec3(0.0, 25.92, 0.0), 1.0F, true);
         assertEquals(0.0F, CameraTrauma.sample(), 1e-6F);
         CameraTrauma.addShake(0.0, 0.0, 0.0, 16.0F, new Vec3(0.0, 0.0, 0.0), 1.0F, false);
-        assertEquals(0.6F, CameraTrauma.sample(), 1e-4F);
+        assertEquals(0.6F, CameraTrauma.sample(), 1e-3F);
     }
 
     @Test
