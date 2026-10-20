@@ -16,11 +16,14 @@ manual checklist.
 | Java | 25 |
 | Fabric | Fabric Loader 0.19.5+ with Fabric API 0.162.0+26.3 |
 | NeoForge | 26.3.0.76+ |
+| Armature | 1.1.0 or newer, required on both sides |
 | Sides | client and server |
 
-Put the matching Fabric or NeoForge jar in `mods/` on both the client and the server. Fabric needs
-Fabric API; NeoForge needs no companion mod. Do not install Stature beside Pehkui or Pehkui
-Rebuilt; see [compatibility](docs/reference/compatibility.md).
+Put the matching Fabric or NeoForge Stature jar and the matching Armature jar in `mods/` on both
+the client and the server. Stature will not load without Armature; the loader names the missing
+dependency rather than failing later on a class it cannot find. Fabric also needs Fabric API;
+NeoForge needs no companion API mod. Do not install Stature beside Pehkui or Pehkui Rebuilt; see
+[compatibility](docs/reference/compatibility.md).
 
 ## Building
 
@@ -31,6 +34,14 @@ Rebuilt; see [compatibility](docs/reference/compatibility.md).
 On Unix, `./gradlew build`. JDK 25 is required. The wrapper's daemon JVM is declared in
 `gradle/gradle-daemon-jvm.properties` (Gradle's daemon JVM criteria), so an installed JDK 25 is
 found rather than a machine path being committed.
+
+Stature compiles against Armature 1.1.0 from Maven local first, then from
+`https://maven.ellipog.dev`. Until that version is released, publish it once from the sibling
+checkout:
+
+```cmd
+..\armature\gradlew.bat publishToMavenLocal
+```
 
 The build runs the game-free unit tests and the Fabric server gametests. The NeoForge gametest and
 the Fabric client gametest are separate commands, documented in [TESTING.md](TESTING.md).

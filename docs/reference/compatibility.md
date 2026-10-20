@@ -8,6 +8,12 @@ Stature is a scale authority. It writes the base value of `minecraft:scale` and 
 one deciding an entity's size. Mods that agree with that, or only read it, coexist. Mods that also
 choose the scale need care.
 
+## Armature
+
+Stature requires Armature 1.1.0 or newer on both the client and the server. Armature supplies the
+loader seam, the networking and the config reader Stature is built on, so a client without it is
+refused rather than shown a wrong-size world. Install the matching Armature jar beside Stature's.
+
 ## Pehkui and Pehkui Rebuilt
 
 Do not install Stature with Pehkui or Pehkui Rebuilt. All of them write the game's scale attribute,
@@ -28,7 +34,7 @@ authority.
 
 ## Spawn protection and claims
 
-Trampling asks before it breaks anything. For a player, the loader seam checks:
+Trampling asks before it breaks anything. For a player, Armature's platform seam checks:
 
 - `mayBuild`, which covers adventure and spectator rules.
 - The level's `mayInteract`, which is where spawn protection lives.
@@ -77,7 +83,7 @@ and the client draws what it is sent.
 - A server with Stature and a client without it is refused rather than shown wrong-size entities,
   because a client that does not know the shape would collide and draw against the vanilla box.
 
-Fabric needs Fabric API. NeoForge needs no companion API mod.
+Both loaders need Armature. Fabric also needs Fabric API; NeoForge needs no companion API mod.
 
 ## Data packs and reloads
 

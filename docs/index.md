@@ -18,7 +18,7 @@ says otherwise.
 | Fabric | Fabric Loader 0.19.5+ with Fabric API 0.162.0+26.3 |
 | NeoForge | 26.3.0.76+ |
 | Both sides | Stature is required on the client and on the server. A client without it is refused rather than shown a wrong-size world |
-| Other mods | none required |
+| Armature | 1.1.0 or newer, required on both sides. Stature uses its loader seam, networking and config reader |
 
 Do not install Stature beside Pehkui or Pehkui Rebuilt. All of them write the game's
 `minecraft:scale` attribute, and Stature expects to be the one choosing its base value. See

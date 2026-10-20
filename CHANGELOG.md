@@ -59,6 +59,15 @@ Stature has not been released yet. This section covers everything on `master` so
 
 ### Changed
 
+- Stature now requires Armature 1.1.0 or newer on both sides. The loader seam, networking and
+  config file reader are Armature's; the scale, channels, frames, collision, attribute bridges,
+  matrix maths and the public API stay Stature's.
+- `config/stature.json` keeps its path, keys, defaults and semantics, but is now read through
+  Armature's config reader. A malformed file is reported and left exactly as found, and bad values
+  keep their previous ones.
+- Payloads are declared once through `ArmatureNetwork`; the per-loader registration and the
+  NeoForge client payload event are gone. Tracking and nearby sends still use the narrow scopes
+  M5 introduced.
 - Unset channels now follow the scale only where the game does not already scale the value:
   reach, step, motion, jump, flight and safe fall follow; combat, defence, health, AI ranges and
   physics constants stay vanilla unless overridden.
@@ -77,6 +86,8 @@ Stature has not been released yet. This section covers everything on `master` so
 
 - The `stature:voice_pitch` channel. Voice mods compute pitch from height themselves. A world that
   saved the old id still loads: the unknown channel is skipped quietly.
+- `StaturePlatform`, `StatureNetworking`, both loader network classes, the NeoForge client payload
+  handler class, and the hand-written config reader. Their jobs are Armature's now.
 
 ### Fixed
 
