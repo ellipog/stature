@@ -29,7 +29,29 @@ class StatureConfigTest {
                   "trample_max_per_scan": 8,
                   "trample_drops": true,
                   "seismic_footsteps": true,
-                  "doorway_collision": true
+                  "doorway_collision": true,
+                  "projectile_scale": true,
+                  "projectile_scale_strength": 1.0,
+                  "projectile_scale_min": 0.25,
+                  "projectile_scale_max": 4.0,
+                  "projectile_damage_strength": 1.0,
+                  "projectile_speed_strength": 0.5,
+                  "item_pickup_range": true,
+                  "item_pickup_range_strength": 1.0,
+                  "item_pickup_range_min": 0.25,
+                  "item_pickup_range_max": 4.0,
+                  "riding_offset": true,
+                  "riding_offset_strength": 1.0,
+                  "riding_offset_min": 0.25,
+                  "riding_offset_max": 4.0,
+                  "explosion_scale": true,
+                  "explosion_scale_strength": 1.0,
+                  "explosion_scale_min": 0.25,
+                  "explosion_scale_max": 3.0,
+                  "drops_scale": true,
+                  "drops_scale_strength": 1.0,
+                  "drops_scale_min": 1.0,
+                  "drops_scale_max": 3.0
                 }
                 """).getAsJsonObject(), "test");
     }
@@ -131,5 +153,89 @@ class StatureConfigTest {
         assertFalse(StatureConfig.applySynced(3.0F, 2.0F, Map.of()));
         assertEquals(0.25F, StatureConfig.microThreshold());
         assertEquals(2.5F, StatureConfig.macroThreshold());
+    }
+
+    @Test
+    void newFeatureFlagsAndTuningLoad() {
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "projectile_scale": false,
+                  "projectile_scale_strength": 0.5,
+                  "projectile_scale_max": 2.0,
+                  "drops_scale_min": 1.0,
+                  "drops_scale_max": 2.0,
+                  "explosion_scale_strength": 0.0
+                }
+                """).getAsJsonObject(), "test");
+        assertEquals(Boolean.FALSE, StatureConfig.flagSnapshot().get("projectile_scale"));
+        assertEquals(0.5F, StatureConfig.tuning("projectile_scale_strength"));
+        assertEquals(2.0F, StatureConfig.tuning("projectile_scale_max"));
+        assertEquals(2.0F, StatureConfig.tuning("drops_scale_max"));
+        assertEquals(0.0F, StatureConfig.tuning("explosion_scale_strength"));
+    }
+
+    @Test
+    void aBadTuningNumberKeepsThePreviousOne() {
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"projectile_scale_max\": 200.0}").getAsJsonObject(), "test");
+        assertEquals(4.0F, StatureConfig.tuning("projectile_scale_max"));
+    }
+
+    @Test
+    void aTuningMinimumAboveItsMaximumKeepsTheWholePreviousPair() {
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"projectile_scale_min\": 5.0}").getAsJsonObject(), "test");
+        // The min is individually valid but would invert the pair, so the pair stays.
+        assertEquals(0.25F, StatureConfig.tuning("projectile_scale_min"));
+        assertEquals(4.0F, StatureConfig.tuning("projectile_scale_max"));
+    }
+
+    @Test
+    void applySyncedRejectsAnUnknownTuningKeyWithoutApplyingAnyOfIt() {
+        assertFalse(StatureConfig.applySynced(0.5F, 3.0F,
+                Map.of("trampling", false),
+                Map.of("projectile_scale_strength", 0.5F, "hoverboards", 1.0F)));
+        assertEquals(1.0F, StatureConfig.tuning("projectile_scale_strength"));
+        assertEquals(Boolean.TRUE, StatureConfig.flagSnapshot().get("trampling"));
+    }
+
+    @Test
+    void applySyncedCarriesTuning() {
+        assertTrue(StatureConfig.applySynced(0.5F, 3.0F,
+                Map.of("drops_scale", false),
+                Map.of("drops_scale_max", 2.5F)));
+        assertEquals(Boolean.FALSE, StatureConfig.flagSnapshot().get("drops_scale"));
+        assertEquals(2.5F, StatureConfig.tuning("drops_scale_max"));
+    }
+
+    @Test
+    void aTuningMinAndMaxMayMoveTogether() {
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"drops_scale_min\": 2.0, \"drops_scale_max\": 4.0}")
+                .getAsJsonObject(), "test");
+        assertEquals(2.0F, StatureConfig.tuning("drops_scale_min"));
+        assertEquals(4.0F, StatureConfig.tuning("drops_scale_max"));
+    }
+
+    @Test
+    void theDefaultFileWritesEveryNewFeature() throws Exception {
+        Path dir = Files.createTempDirectory("stature-config");
+        try {
+            StatureConfig.load(dir);
+            String written = Files.readString(dir.resolve("stature.json"));
+            for (String key : new String[]{
+                    "projectile_scale", "item_pickup_range", "riding_offset",
+                    "explosion_scale", "drops_scale", "projectile_scale_min",
+                    "drops_scale_max"}) {
+                assertTrue(written.contains("\"" + key + "\""), key);
+            }
+        } finally {
+            try (var files = Files.list(dir)) {
+                for (Path path : files.toList()) {
+                    Files.deleteIfExists(path);
+                }
+            }
+            Files.deleteIfExists(dir);
+        }
     }
 }

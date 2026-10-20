@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import dev.ellipog.stature.api.AxesTransition;
@@ -111,6 +112,7 @@ public final class FrameService {
             duck.stature$setFrameSource(FrameSource.NONE);
             duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
             duck.stature$setFirstPersonVanilla(false);
+            clearFrameChannels(entity, StatureEvents.Cause.INTEGRATION);
             duck.stature$partFactors().clear();
             duck.stature$partTransitions().clear();
             ScaleService.setSize(
@@ -188,6 +190,7 @@ public final class FrameService {
             duck.stature$setFrame(null);
             duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
             duck.stature$setFirstPersonVanilla(false);
+            clearFrameChannels(entity, cause);
             duck.stature$setFrameSource(FrameSource.MANUAL);
             ScaleService.setSize(
                     entity, ScaleService.stateOf(entity).withAxes(axes), ticks, easing, cause);
@@ -211,6 +214,7 @@ public final class FrameService {
             duck.stature$setFrameSource(FrameSource.MANUAL);
             duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
             duck.stature$setFirstPersonVanilla(false);
+            clearFrameChannels(entity, StatureEvents.Cause.COMMAND);
             duck.stature$partFactors().clear();
             duck.stature$partTransitions().clear();
             ScaleService.setSize(
@@ -286,8 +290,14 @@ public final class FrameService {
         int updated = 0;
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity entity : level.getAllEntities()) {
-                if (entity instanceof LivingEntity living && refreshOne(living)) {
-                    updated++;
+                if (entity instanceof LivingEntity living) {
+                    // A reload can happen inside a tick in which this entity already cached the
+                    // old file. Drop it before re-resolving, or a same-tick answer would survive
+                    // the reload that was meant to replace it.
+                    ((StatureScale) living).stature$clearFrameFileCache();
+                    if (refreshOne(living)) {
+                        updated++;
+                    }
                 }
             }
         }
@@ -300,6 +310,27 @@ public final class FrameService {
     }
 
     /**
+     * The frame file for this entity, looked up at most once per tick.
+     *
+     * <p>Threshold flags, both edges, first-person arms and automatic resolution all read the same
+     * frame in one tick. The id is already on the entity; caching only the registry lookup keeps
+     * the answer exact while removing the repeated map probes. The cache is tied to
+     * {@code tickCount}, cleared whenever the frame is set, and cleared over the world before a
+     * reload re-resolves entities.
+     */
+    public static @Nullable FrameFile frameFileOf(LivingEntity entity) {
+        StatureScale duck = (StatureScale) entity;
+        int tick = entity.tickCount;
+        if (duck.stature$frameFileCacheTick() == tick) {
+            return duck.stature$frameFileCache();
+        }
+        Identifier frameId = duck.stature$frame();
+        FrameFile file = frameId == null ? null : StatureFrames.file(frameId);
+        duck.stature$setFrameFileCache(file, tick);
+        return file;
+    }
+
+    /**
      * Re-derives the first-person flag from the entity's frame.
      *
      * <p>The flag is never saved: the frame is the source of truth, so a load and any
@@ -309,12 +340,8 @@ public final class FrameService {
      */
     public static void refreshFirstPerson(LivingEntity entity) {
         StatureScale duck = (StatureScale) entity;
-        Identifier frameId = duck.stature$frame();
-        boolean vanilla = false;
-        if (frameId != null) {
-            FrameFile file = StatureFrames.file(frameId);
-            vanilla = file != null && file.firstPersonArms() != null && file.firstPersonArms();
-        }
+        FrameFile file = frameFileOf(entity);
+        boolean vanilla = file != null && file.firstPersonArms() != null && file.firstPersonArms();
         duck.stature$setFirstPersonVanilla(vanilla);
     }
 
@@ -341,6 +368,19 @@ public final class FrameService {
         StatureScale duck = (StatureScale) entity;
         StatureEvents.batch(() -> {
             Identifier beforeFrame = duck.stature$frame();
+            Map<String, Float> oldChannels = Map.copyOf(duck.stature$frameChannelValues());
+            for (Map.Entry<String, Float> old : oldChannels.entrySet()) {
+                if (!file.channels().containsKey(old.getKey())
+                        && Objects.equals(duck.stature$channelOverrides().get(old.getKey()), old.getValue())) {
+                    ChannelService.resetChannel(entity, old.getKey(), cause);
+                }
+            }
+            duck.stature$frameChannelValues().clear();
+            for (Map.Entry<String, Float> channel : file.channels().entrySet()) {
+                ChannelService.setChannel(
+                        entity, channel.getKey(), channel.getValue(), ticks, frame.easing(), cause);
+                duck.stature$frameChannelValues().put(channel.getKey(), channel.getValue());
+            }
             duck.stature$setFrame(frameId);
             duck.stature$setFrameSource(source);
             duck.stature$setEyeHeight(
@@ -401,6 +441,24 @@ public final class FrameService {
         return resolved;
     }
 
+    /**
+     * Removes the overrides a frame introduced, but only where they still hold the frame's value.
+     *
+     * <p>An operator who changed one of those channels after the frame was applied owns the new
+     * value; clearing the frame must not silently throw that choice away.
+     */
+    private static void clearFrameChannels(LivingEntity entity, StatureEvents.Cause cause) {
+        StatureScale duck = (StatureScale) entity;
+        Map<String, Float> owned = Map.copyOf(duck.stature$frameChannelValues());
+        for (Map.Entry<String, Float> entry : owned.entrySet()) {
+            if (Objects.equals(
+                    duck.stature$channelOverrides().get(entry.getKey()), entry.getValue())) {
+                ChannelService.resetChannel(entity, entry.getKey(), cause);
+            }
+        }
+        duck.stature$frameChannelValues().clear();
+    }
+
     private static boolean refreshOne(LivingEntity entity) {
         StatureScale duck = (StatureScale) entity;
         FrameSource source = duck.stature$frameSource();
@@ -444,6 +502,7 @@ public final class FrameService {
             duck.stature$setFrameSource(FrameSource.DEFAULT);
             duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
             duck.stature$setFirstPersonVanilla(false);
+            clearFrameChannels(entity, StatureEvents.Cause.FRAME);
             duck.stature$partFactors().clear();
             duck.stature$partTransitions().clear();
             ScaleService.setSize(

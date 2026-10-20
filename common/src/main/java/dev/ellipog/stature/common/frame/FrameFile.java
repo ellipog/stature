@@ -28,6 +28,7 @@ public record FrameFile(
         Map<String, List<Float>> parts,
         boolean hitboxFromParts,
         List<FrameRegion> regions,
+        Map<String, Float> channels,
         Float thresholdMicro,
         Float thresholdMacro,
         Map<String, Boolean> thresholdFlags,
@@ -38,6 +39,7 @@ public record FrameFile(
         entityTags = List.copyOf(entityTags);
         parts = Map.copyOf(parts);
         regions = List.copyOf(regions);
+        channels = Map.copyOf(channels);
         thresholdFlags = Map.copyOf(thresholdFlags);
     }
 

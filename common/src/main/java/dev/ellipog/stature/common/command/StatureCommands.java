@@ -695,7 +695,8 @@ public final class StatureCommands {
         int count = FrameService.reloadFrameData(server.getResourceManager());
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             StatureNetworking.sendConfigTo(player,
-                    StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot());
+                    StatureConfig.microThreshold(), StatureConfig.macroThreshold(),
+                    StatureConfig.flagSnapshot(), StatureConfig.tuningSnapshot());
         }
         int updated = FrameService.refreshAutomatic(server);
         StatureConfig.refreshAllThresholds(server);

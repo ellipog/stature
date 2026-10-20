@@ -74,7 +74,8 @@ public final class NeoForgeStatureClientPayloads {
             }
         }));
         event.register(ConfigPayload.TYPE, (payload, context) -> context.enqueueWork(() ->
-                StatureConfig.applySynced(payload.micro(), payload.macro(), payload.flags())));
+                StatureConfig.applySynced(
+                        payload.micro(), payload.macro(), payload.flags(), payload.tuning())));
         event.register(FootstepPayload.TYPE, (payload, context) -> context.enqueueWork(() -> {
             Vec3 camera = ClientViews.cameraPosition();
             if (camera != null) {

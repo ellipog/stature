@@ -65,4 +65,22 @@ class FrameCodecThresholdsTest {
         assertThrows(FrameFormatException.class,
                 () -> parse("{\"size\": [1.0, 1.0], \"first_person_arms\": \"sometimes\"}"));
     }
+
+    @Test
+    void channelsParseAndUnknownIdsAreSkipped() throws Exception {
+        FrameFile file = parse("{\"size\": [1.0, 1.0], \"channels\": {"
+                + "\"stature:projectile_scale\": 2.0, \"mypack:not_declared\": 4.0}}");
+        assertEquals(Map.of("stature:projectile_scale", 2.0F), file.channels());
+    }
+
+    @Test
+    void aNonNumericChannelFailsTheFile() {
+        assertThrows(FrameFormatException.class,
+                () -> parse("{\"size\": [1.0, 1.0], \"channels\": {\"stature:model\": \"huge\"}}"));
+    }
+
+    @Test
+    void absentChannelsAreEmpty() throws Exception {
+        assertTrue(parse("{\"size\": [1.0, 1.0]}").channels().isEmpty());
+    }
 }

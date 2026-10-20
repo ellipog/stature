@@ -16,6 +16,7 @@ import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.client.RenderSampler;
 import dev.ellipog.stature.common.parts.PartService;
+import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
 import dev.ellipog.stature.common.net.StatureNetworking;
@@ -88,6 +89,9 @@ public abstract class LivingEntityMixin implements StatureScale {
     private Map<String, StatureEvents.Cause> stature$channelCauses;
 
     @Unique
+    private Map<String, Float> stature$frameChannelValues;
+
+    @Unique
     private Map<String, ScaleAxes> stature$partFactors;
 
     @Unique
@@ -109,6 +113,12 @@ public abstract class LivingEntityMixin implements StatureScale {
     private HitRegion stature$lastHit;
 
     @Unique
+    private float stature$incomingProjectileDamage = 1.0F;
+
+    @Unique
+    private int stature$incomingProjectileTick = Integer.MIN_VALUE;
+
+    @Unique
     private float stature$eyeHeight = NO_EYE_HEIGHT;
 
     @Unique
@@ -117,6 +127,13 @@ public abstract class LivingEntityMixin implements StatureScale {
     @Unique
     @Nullable
     private ResolvedThresholds stature$thresholds;
+
+    @Unique
+    @Nullable
+    private FrameFile stature$frameFileCache;
+
+    @Unique
+    private int stature$frameFileCacheTick = Integer.MIN_VALUE;
 
     @Override
     public ScaleTransition stature$transition() {
@@ -159,6 +176,7 @@ public abstract class LivingEntityMixin implements StatureScale {
     @Override
     public void stature$setFrame(@Nullable Identifier frame) {
         this.stature$frame = frame;
+        this.stature$clearFrameFileCache();
     }
 
     @Override
@@ -203,6 +221,14 @@ public abstract class LivingEntityMixin implements StatureScale {
             this.stature$channelCauses = new LinkedHashMap<>();
         }
         return this.stature$channelCauses;
+    }
+
+    @Override
+    public Map<String, Float> stature$frameChannelValues() {
+        if (this.stature$frameChannelValues == null) {
+            this.stature$frameChannelValues = new LinkedHashMap<>();
+        }
+        return this.stature$frameChannelValues;
     }
 
     @Override
@@ -272,6 +298,22 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Override
+    public float stature$incomingProjectileDamage() {
+        return this.stature$incomingProjectileDamage;
+    }
+
+    @Override
+    public int stature$incomingProjectileTick() {
+        return this.stature$incomingProjectileTick;
+    }
+
+    @Override
+    public void stature$setIncomingProjectileDamage(float multiplier, int tick) {
+        this.stature$incomingProjectileDamage = multiplier;
+        this.stature$incomingProjectileTick = tick;
+    }
+
+    @Override
     public float stature$eyeHeight() {
         return this.stature$eyeHeight;
     }
@@ -289,6 +331,28 @@ public abstract class LivingEntityMixin implements StatureScale {
     @Override
     public void stature$setThresholds(@Nullable ResolvedThresholds thresholds) {
         this.stature$thresholds = thresholds;
+    }
+
+    @Override
+    public @Nullable FrameFile stature$frameFileCache() {
+        return this.stature$frameFileCache;
+    }
+
+    @Override
+    public int stature$frameFileCacheTick() {
+        return this.stature$frameFileCacheTick;
+    }
+
+    @Override
+    public void stature$setFrameFileCache(@Nullable FrameFile file, int tick) {
+        this.stature$frameFileCache = file;
+        this.stature$frameFileCacheTick = tick;
+    }
+
+    @Override
+    public void stature$clearFrameFileCache() {
+        this.stature$frameFileCache = null;
+        this.stature$frameFileCacheTick = Integer.MIN_VALUE;
     }
 
     @Override
@@ -361,12 +425,20 @@ public abstract class LivingEntityMixin implements StatureScale {
     private float stature$scaleRegionDamage(float damage) {
         LivingEntity self = (LivingEntity) (Object) this;
         HitRegion region = this.stature$incomingRegion;
-        if (region == null || region.tick() != self.tickCount) {
-            return damage;
+        if (region != null && region.tick() == self.tickCount) {
+            this.stature$incomingRegion = null;
+            this.stature$lastHit = region;
+            damage *= region.multiplier();
         }
-        this.stature$incomingRegion = null;
-        this.stature$lastHit = region;
-        return damage * region.multiplier();
+        // A projectile's inherited size is part of the hit it carries. The stashed multiplier is
+        // spent here, once, and only in the tick the hit arrived; a miss or an invulnerable roll
+        // leaves it to expire rather than charging the next fire tick.
+        if (this.stature$incomingProjectileTick == self.tickCount) {
+            damage *= this.stature$incomingProjectileDamage;
+            this.stature$incomingProjectileTick = Integer.MIN_VALUE;
+            this.stature$incomingProjectileDamage = 1.0F;
+        }
+        return damage;
     }
 
     /**

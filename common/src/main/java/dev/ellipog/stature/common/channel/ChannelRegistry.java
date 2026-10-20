@@ -97,6 +97,15 @@ public final class ChannelRegistry {
         registerBuiltIn(new ChannelSpec("stature:visibility", ChannelFollow.NONE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:held_item", ChannelFollow.NONE, 1.0, false));
         registerBuiltIn(new ChannelSpec("stature:shadow", ChannelFollow.NONE, 1.0, false));
+        // Channels Stature applies itself rather than through an attribute. They follow the scale
+        // like body physics, and each has a global config switch, strength and min/max clamp.
+        registerBuiltIn(new ChannelSpec("stature:projectile_scale", ChannelFollow.BASE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:item_pickup_range", ChannelFollow.BASE, 1.0, false));
+        registerBuiltIn(new ChannelSpec("stature:riding_offset", ChannelFollow.BASE, 1.0, false));
+        // Explosions and loot grow with the cube root-ish of size rather than linearly: a 16x
+        // creeper should be terrifying, not erase the render distance.
+        registerBuiltIn(new ChannelSpec("stature:explosion_scale", ChannelFollow.BASE, 0.5, false));
+        registerBuiltIn(new ChannelSpec("stature:drops_scale", ChannelFollow.BASE, 0.5, false));
     }
 
     private void registerBuiltIn(ChannelSpec spec) {

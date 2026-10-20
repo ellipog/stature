@@ -1,11 +1,15 @@
 package dev.ellipog.stature.common.mixin;
 
+import java.util.Map;
 import java.util.Objects;
+
+import com.mojang.serialization.Codec;
 
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.SaveGate;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureProjectile;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.Thresholds;
@@ -20,7 +24,9 @@ import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -85,6 +91,11 @@ public abstract class EntityMixin {
 
     private static final String KEY_DANGEROUS_MODEL = "stature_dangerous_model";
 
+    private static final String KEY_FRAME_CHANNELS = "stature_frame_channels";
+
+    private static final Codec<Map<String, Float>> FRAME_CHANNEL_CODEC =
+            Codec.unboundedMap(Codec.STRING, Codec.FLOAT);
+
     private static final String KEY_FORMAT = "stature_format";
 
     /**
@@ -123,6 +134,23 @@ public abstract class EntityMixin {
             if (!living.level().isClientSide()) {
                 StatureNetworking.broadcastFootstep(living, volume);
             }
+        }
+    }
+
+    /**
+     * Scales a projectile's box from the size its shooter gave it.
+     *
+     * <p>This is the server and client hitbox: the enlarged dimensions are what entity movement,
+     * projectile collision and pickup use, so hit detection cannot disagree with the drawn size.
+     * Living entities have their own, final implementation of this method; a projectile inherits
+     * this one.
+     */
+    @Inject(method = "getDimensions", at = @At("RETURN"), cancellable = true)
+    private void stature$projectileDimensions(Pose pose, CallbackInfoReturnable<EntityDimensions> cir) {
+        if ((Object) this instanceof StatureProjectile projectile
+                && projectile.stature$projectileScaled()
+                && projectile.stature$projectileScale() != 1.0F) {
+            cir.setReturnValue(cir.getReturnValue().scale(projectile.stature$projectileScale()));
         }
     }
 
@@ -185,6 +213,11 @@ public abstract class EntityMixin {
             // plain /stature set keep the old dangerous model.
             output.putBoolean(KEY_DANGEROUS_MODEL, true);
         }
+        if (scaled instanceof LivingEntity frameChannels
+                && !((StatureScale) frameChannels).stature$frameChannelValues().isEmpty()) {
+            output.store(KEY_FRAME_CHANNELS, FRAME_CHANNEL_CODEC,
+                    ((StatureScale) frameChannels).stature$frameChannelValues());
+        }
         output.putInt(KEY_FORMAT, SAVE_FORMAT);
 
         // Overrides travel; easing progress does not. A load lands, it never resumes a glide.
@@ -236,10 +269,17 @@ public abstract class EntityMixin {
                 ? ChannelService.load(living, input)
                 : false;
         boolean parts = PartService.load(scaled, input);
+        Map<String, Float> frameChannels = input.read(KEY_FRAME_CHANNELS, FRAME_CHANNEL_CODEC)
+                .filter(values -> !values.isEmpty())
+                .orElse(Map.of());
+        if (scaled instanceof LivingEntity livingWithFrameChannels) {
+            ((StatureScale) livingWithFrameChannels).stature$frameChannelValues().clear();
+            ((StatureScale) livingWithFrameChannels).stature$frameChannelValues().putAll(frameChannels);
+        }
 
         if (width == 1.0F && height == 1.0F && depth == 1.0F
                 && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null && source == null
-                && !channels && !parts) {
+                && !channels && !parts && frameChannels.isEmpty()) {
             return;
         }
 

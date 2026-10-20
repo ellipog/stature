@@ -52,7 +52,7 @@ The manual lives in [docs/](docs/index.md), written for ellipog.dev.
 |---|---|
 | [Commands](docs/commands.md) | Every `/stature` subcommand |
 | [Frames](docs/frames.md) | The datapack frame format and its examples |
-| [Channels](docs/channels.md) | The 43 built-in channels and override semantics |
+| [Channels](docs/channels.md) | The 48 built-in channels and override semantics |
 | [Parts and regions](docs/parts-and-regions.md) | Rigs, part factors and hurt regions |
 | [Thresholds](docs/thresholds.md) | The config file and the micro and macro mechanics |
 | [Dangerous sizes](docs/dangerous.md) | Sizes past the game's scale envelope |

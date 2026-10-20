@@ -473,6 +473,9 @@ public final class ChannelService {
     }
 
     private static float resolvedValue(LivingEntity entity, ChannelSpec spec) {
+        if (StatureConfig.isTunedChannel(spec.id())) {
+            return ChannelTuning.factor(entity, spec.id());
+        }
         return resolvedValue(entity, spec,
                 ScaleService.stateOf(entity).scale(), ((StatureScale) entity).stature$axes());
     }

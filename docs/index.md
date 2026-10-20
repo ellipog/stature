@@ -43,9 +43,9 @@ Do not install Stature beside Pehkui or Pehkui Rebuilt. All of them write the ga
 |---|---|
 | [[stature:commands]] | Every `/stature` subcommand, with examples |
 | [[stature:frames]] | The frame file format, assignments, precedence and worked examples |
-| [[stature:channels]] | The 43 built-in channels, their defaults and what an override means |
+| [[stature:channels]] | The 48 built-in channels, their defaults and what an override means |
 | [[stature:parts-and-regions]] | Rigs, part factors, first-person arms and hurt regions |
-| [[stature:thresholds]] | The server config file and the micro and macro mechanics |
+| [[stature:thresholds]] | The server config file, the M10 channel options and the micro and macro mechanics |
 | [[stature:dangerous]] | Sizes past the game's scale envelope, and how the box and the model separate |
 | [[stature:compatibility]] | Pehkui, other scale modifiers, claims, shaders and the client and server rules |
 | [[stature:api]] | The supported facade for another mod: sizes, shapes, channels and integration frames |

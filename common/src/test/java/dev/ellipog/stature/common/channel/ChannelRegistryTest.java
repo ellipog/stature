@@ -35,11 +35,13 @@ class ChannelRegistryTest {
                 "stature:camera_distance", "stature:name_tag_distance", "stature:below_name_distance",
                 "stature:model", "stature:saturation",
                 "stature:knockback_received", "stature:knockback_dealt",
-                "stature:visibility", "stature:held_item", "stature:shadow"}) {
+                "stature:visibility", "stature:held_item", "stature:shadow",
+                "stature:projectile_scale", "stature:item_pickup_range", "stature:riding_offset",
+                "stature:explosion_scale", "stature:drops_scale"}) {
             assertTrue(registry.get(id) != null, id);
             assertFalse(registry.get(id).experimental(), id);
         }
-        assertEquals(43, registry.size());
+        assertEquals(48, registry.size());
     }
 
     @Test

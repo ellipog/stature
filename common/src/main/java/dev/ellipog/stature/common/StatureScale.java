@@ -8,8 +8,9 @@ import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.client.RenderSampler;
-import dev.ellipog.stature.common.parts.HitRegion;
+import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameSource;
+import dev.ellipog.stature.common.parts.HitRegion;
 
 import java.util.Map;
 
@@ -125,6 +126,15 @@ public interface StatureScale {
     Map<String, StatureEvents.Cause> stature$channelCauses();
 
     /**
+     * The channel values the currently applied frame owns, by channel id.
+     *
+     * <p>Kept beside the ordinary overrides so a frame clear can remove exactly the overrides the
+     * frame introduced. A channel an operator changed after the frame was applied no longer
+     * matches its stored value, so removing the frame leaves that operator choice alone.
+     */
+    Map<String, Float> stature$frameChannelValues();
+
+    /**
      * This entity's part factors by model path, live. Empty means a vanilla silhouette; use
      * {@code PartService}, not this map, for the same lifecycle reasons as channels.
      */
@@ -187,6 +197,20 @@ public interface StatureScale {
 
     void stature$setLastHit(HitRegion hit);
 
+    /**
+     * The damage multiplier of a projectile hit waiting to be applied, and the tick it arrived.
+     *
+     * <p>Carried beside {@link #stature$incomingRegion()} because the hurt funnel receives a
+     * {@code DamageSource}, not the projectile that produced it, and the hit dispatcher is the one
+     * place that knows both. The tick guard keeps a hit that never became damage from being spent
+     * on an unrelated fire tick later.
+     */
+    float stature$incomingProjectileDamage();
+
+    int stature$incomingProjectileTick();
+
+    void stature$setIncomingProjectileDamage(float multiplier, int tick);
+
     /** The frame's eye height in blocks at scale 1, or {@link #NO_EYE_HEIGHT}. */
     float stature$eyeHeight();
 
@@ -204,4 +228,21 @@ public interface StatureScale {
     ResolvedThresholds stature$thresholds();
 
     void stature$setThresholds(@Nullable ResolvedThresholds thresholds);
+
+    /**
+     * The frame file resolved for this entity's current tick, or null when it has no frame.
+     *
+     * <p>A server tick asks the same question several times: threshold flags, both edges, first
+     * person arms and frame resolution. The id is already on the entity, so only the registry
+     * lookup is cached, and only for the tick it was made in. The cache is cleared whenever the
+     * frame changes or the registry reloads, so a lookup never outlives its answer.
+     */
+    @Nullable
+    FrameFile stature$frameFileCache();
+
+    int stature$frameFileCacheTick();
+
+    void stature$setFrameFileCache(@Nullable FrameFile file, int tick);
+
+    void stature$clearFrameFileCache();
 }

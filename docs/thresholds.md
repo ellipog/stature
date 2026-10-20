@@ -29,7 +29,29 @@ The server creates the file with its defaults on first start. It is re-read by
   "trample_max_per_scan": 8,
   "trample_drops": true,
   "seismic_footsteps": true,
-  "doorway_collision": true
+  "doorway_collision": true,
+  "projectile_scale": true,
+  "projectile_scale_strength": 1.0,
+  "projectile_scale_min": 0.25,
+  "projectile_scale_max": 4.0,
+  "projectile_damage_strength": 1.0,
+  "projectile_speed_strength": 0.5,
+  "item_pickup_range": true,
+  "item_pickup_range_strength": 1.0,
+  "item_pickup_range_min": 0.25,
+  "item_pickup_range_max": 4.0,
+  "riding_offset": true,
+  "riding_offset_strength": 1.0,
+  "riding_offset_min": 0.25,
+  "riding_offset_max": 4.0,
+  "explosion_scale": true,
+  "explosion_scale_strength": 1.0,
+  "explosion_scale_min": 0.25,
+  "explosion_scale_max": 3.0,
+  "drops_scale": true,
+  "drops_scale_strength": 1.0,
+  "drops_scale_min": 1.0,
+  "drops_scale_max": 3.0
 }
 ```
 
@@ -45,6 +67,28 @@ The server creates the file with its defaults on first start. It is re-read by
 | `trample_drops` | true | Whether trampled blocks drop their items |
 | `seismic_footsteps` | true | Louder, deeper steps and camera shake for macro entities |
 | `doorway_collision` | true | Compression damage for a macro entity whose head is inside a full block |
+| `projectile_scale` | true | Projectiles fired by a scaled entity inherit its size, hitbox, damage and launch speed |
+| `item_pickup_range` | true | Items and experience orbs are picked up from the scaled reach |
+| `riding_offset` | true | A mount's passenger attachment follows the riding offset channel |
+| `explosion_scale` | true | Explosions with a living cause use the scaled radius |
+| `drops_scale` | true | Loot-table stack counts use the scaled count |
+| `projectile_scale_strength` | 1.0 | Multiplier on the followed projectile factor. 0 to 4 |
+| `projectile_scale_min` | 0.25 | Lower clamp on the projectile factor, including overrides. Above 0 |
+| `projectile_scale_max` | 4.0 | Upper clamp on the projectile factor. At least the minimum |
+| `projectile_damage_strength` | 1.0 | Linear damage strength: `1 + (factor - 1) * strength`. 0 to 4 |
+| `projectile_speed_strength` | 0.5 | Launch-speed exponent: `factor ^ strength`. 0 to 2 |
+| `item_pickup_range_strength` | 1.0 | Multiplier on the followed pickup factor. 0 to 4 |
+| `item_pickup_range_min` | 0.25 | Lower clamp on the pickup factor. Above 0 |
+| `item_pickup_range_max` | 4.0 | Upper clamp on the pickup factor. At least the minimum |
+| `riding_offset_strength` | 1.0 | Multiplier on the followed seat factor. 0 to 4 |
+| `riding_offset_min` | 0.25 | Lower clamp on the seat factor. Above 0 |
+| `riding_offset_max` | 4.0 | Upper clamp on the seat factor. At least the minimum |
+| `explosion_scale_strength` | 1.0 | Multiplier on the followed explosion factor. 0 to 4 |
+| `explosion_scale_min` | 0.25 | Lower clamp on the explosion factor. Above 0 |
+| `explosion_scale_max` | 3.0 | Upper clamp on the explosion factor. At least the minimum |
+| `drops_scale_strength` | 1.0 | Multiplier on the followed drops factor. 0 to 4 |
+| `drops_scale_min` | 1.0 | Lower clamp on the drops factor. 1.0 means never less than vanilla |
+| `drops_scale_max` | 3.0 | Upper clamp on the drops factor. At least the minimum |
 
 `comment` is accepted and ignored so an older default file does not log an unknown key. Any other
 unknown key is logged and skipped. A malformed file is reported and the previous values are kept.
@@ -53,6 +97,32 @@ The two edges must satisfy `0 < micro < macro`; a frame can move either edge for
 An entity is micro when its uniform scale is strictly below its micro edge, and macro when it is
 strictly above its macro edge. The box's shape does not decide the tier, only the uniform scale
 does.
+
+## The M10 channel options
+
+The five feature flags above are also the per-entity switches: a frame may set one in its
+`thresholds` object, or a resolved threshold packet can carry it. When a flag is false, the
+matching channel returns exactly 1.0 and the game behaves as vanilla, even if an override is
+stored. The override is kept for when the feature is switched back on.
+
+Each feature has a numeric family in the same file:
+
+- `<channel>_strength` multiplies the followed value. It does not multiply an explicit per-entity
+  override; an override is already a deliberate choice.
+- `<channel>_min` and `<channel>_max` clamp the final factor, including an override, because these
+  factors can change hitboxes, explosion radii and drop counts. A minimum above its maximum keeps
+  the previous pair.
+- `projectile_damage_strength` and `projectile_speed_strength` control the two secondary effects of
+  the projectile channel. Setting either to 0 leaves that part vanilla while the size still
+  follows.
+- `drops_scale_min` defaults to 1.0 so a small entity never gets less loot than vanilla. Its
+  channel exponent is 0.5, so the default count growth is a square root and the default maximum is
+  3x.
+
+All of these values are in the same server config packet as the edges and flags. A joining client
+gets them on login, `/stature reload` resends them, and the debug screen's config packet count is
+unchanged. They are not per-frame numeric overrides; a frame sets an override through its
+`channels` object instead.
 
 ## Frame overrides
 

@@ -17,7 +17,6 @@ import com.google.gson.JsonParser;
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
-import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.resources.Identifier;
@@ -60,6 +59,26 @@ public final class StatureConfig {
 
     public static final String DOORWAY_COLLISION = "doorway_collision";
 
+    public static final String PROJECTILE_SCALE = "projectile_scale";
+
+    public static final String ITEM_PICKUP_RANGE = "item_pickup_range";
+
+    public static final String RIDING_OFFSET = "riding_offset";
+
+    public static final String EXPLOSION_SCALE = "explosion_scale";
+
+    public static final String DROPS_SCALE = "drops_scale";
+
+    public static final String PROJECTILE_SCALE_CHANNEL = "stature:" + PROJECTILE_SCALE;
+
+    public static final String ITEM_PICKUP_RANGE_CHANNEL = "stature:" + ITEM_PICKUP_RANGE;
+
+    public static final String RIDING_OFFSET_CHANNEL = "stature:" + RIDING_OFFSET;
+
+    public static final String EXPLOSION_SCALE_CHANNEL = "stature:" + EXPLOSION_SCALE;
+
+    public static final String DROPS_SCALE_CHANNEL = "stature:" + DROPS_SCALE;
+
     private static Path file;
 
     private static float microThreshold = 0.25F;
@@ -70,13 +89,70 @@ public final class StatureConfig {
 
     private static boolean trampleDrops = true;
 
-    private static final Map<String, Boolean> FLAGS = new LinkedHashMap<>(Map.of(
-            POROUS_TRAVERSAL, true,
-            SURFACE_CLIMBING, true,
-            AMPLIFIED_KNOCKBACK, true,
-            TRAMPLING, true,
-            SEISMIC_FOOTSTEPS, true,
-            DOORWAY_COLLISION, true));
+    private static final Map<String, Boolean> FLAGS = new LinkedHashMap<>();
+
+    static {
+        FLAGS.put(POROUS_TRAVERSAL, true);
+        FLAGS.put(SURFACE_CLIMBING, true);
+        FLAGS.put(AMPLIFIED_KNOCKBACK, true);
+        FLAGS.put(TRAMPLING, true);
+        FLAGS.put(SEISMIC_FOOTSTEPS, true);
+        FLAGS.put(DOORWAY_COLLISION, true);
+        FLAGS.put(PROJECTILE_SCALE, true);
+        FLAGS.put(ITEM_PICKUP_RANGE, true);
+        FLAGS.put(RIDING_OFFSET, true);
+        FLAGS.put(EXPLOSION_SCALE, true);
+        FLAGS.put(DROPS_SCALE, true);
+    }
+
+    /**
+     * Numeric tuning for the channels Stature applies itself, rather than through an attribute.
+     *
+     * <p>Every channel has a strength multiplier for its followed value and a min/max clamp for the
+     * resolved factor. The projectile channel also has damage and speed strengths; both default to
+     * a sane multiplication and can be zeroed without disabling the size inheritance.
+     */
+    private static final Map<String, Float> TUNING = new LinkedHashMap<>(Map.ofEntries(
+            Map.entry("projectile_scale_strength", 1.0F),
+            Map.entry("projectile_scale_min", 0.25F),
+            Map.entry("projectile_scale_max", 4.0F),
+            Map.entry("projectile_damage_strength", 1.0F),
+            Map.entry("projectile_speed_strength", 0.5F),
+            Map.entry("item_pickup_range_strength", 1.0F),
+            Map.entry("item_pickup_range_min", 0.25F),
+            Map.entry("item_pickup_range_max", 4.0F),
+            Map.entry("riding_offset_strength", 1.0F),
+            Map.entry("riding_offset_min", 0.25F),
+            Map.entry("riding_offset_max", 4.0F),
+            Map.entry("explosion_scale_strength", 1.0F),
+            Map.entry("explosion_scale_min", 0.25F),
+            Map.entry("explosion_scale_max", 3.0F),
+            Map.entry("drops_scale_strength", 1.0F),
+            Map.entry("drops_scale_min", 1.0F),
+            Map.entry("drops_scale_max", 3.0F)));
+
+    /** Inclusive bounds for one numeric tuning key. */
+    private record Bound(float min, float max) {
+    }
+
+    private static final Map<String, Bound> BOUNDS = Map.ofEntries(
+            Map.entry("projectile_scale_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("projectile_scale_min", new Bound(0.001F, 16.0F)),
+            Map.entry("projectile_scale_max", new Bound(0.001F, 16.0F)),
+            Map.entry("projectile_damage_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("projectile_speed_strength", new Bound(0.0F, 2.0F)),
+            Map.entry("item_pickup_range_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("item_pickup_range_min", new Bound(0.001F, 16.0F)),
+            Map.entry("item_pickup_range_max", new Bound(0.001F, 16.0F)),
+            Map.entry("riding_offset_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("riding_offset_min", new Bound(0.001F, 16.0F)),
+            Map.entry("riding_offset_max", new Bound(0.001F, 16.0F)),
+            Map.entry("explosion_scale_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("explosion_scale_min", new Bound(0.001F, 16.0F)),
+            Map.entry("explosion_scale_max", new Bound(0.001F, 16.0F)),
+            Map.entry("drops_scale_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("drops_scale_min", new Bound(0.001F, 16.0F)),
+            Map.entry("drops_scale_max", new Bound(0.001F, 16.0F)));
 
     private StatureConfig() {
     }
@@ -109,13 +185,24 @@ public final class StatureConfig {
      */
     public static synchronized boolean applySynced(
             float micro, float macro, Map<String, Boolean> flags) {
+        return applySynced(micro, macro, flags, Map.of());
+    }
+
+    /**
+     * Applies values received from the server, including the numeric tuning.
+     *
+     * <p>As with the edges and flags, the whole packet is validated before anything is written:
+     * one bad tuning value rejects the packet and leaves every previous value in place.
+     */
+    public static synchronized boolean applySynced(
+            float micro, float macro, Map<String, Boolean> flags, Map<String, Float> tuning) {
         if (!Float.isFinite(micro) || !Float.isFinite(macro) || !(micro > 0.0F) || !(macro > micro)) {
             LOG.warn("rejecting synced config: edges must satisfy 0 < micro < macro, got {} and {}",
                     micro, macro);
             return false;
         }
-        if (flags == null) {
-            LOG.warn("rejecting synced config: no flag map");
+        if (flags == null || tuning == null) {
+            LOG.warn("rejecting synced config: missing flag or tuning map");
             return false;
         }
         for (Map.Entry<String, Boolean> entry : flags.entrySet()) {
@@ -125,9 +212,28 @@ public final class StatureConfig {
                 return false;
             }
         }
+        Map<String, Float> nextTuning = new LinkedHashMap<>(TUNING);
+        for (Map.Entry<String, Float> entry : tuning.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) {
+                LOG.warn("rejecting synced config: malformed tuning entry");
+                return false;
+            }
+            if (!validTuning(entry.getKey(), entry.getValue())) {
+                LOG.warn("rejecting synced config: bad tuning value {} for \"{}\"",
+                        entry.getValue(), entry.getKey());
+                return false;
+            }
+            nextTuning.put(entry.getKey(), entry.getValue());
+        }
+        if (!validTuningRanges(nextTuning)) {
+            LOG.warn("rejecting synced config: a tuning minimum is above its maximum");
+            return false;
+        }
         microThreshold = micro;
         macroThreshold = macro;
         FLAGS.putAll(flags);
+        TUNING.clear();
+        TUNING.putAll(nextTuning);
         return true;
     }
 
@@ -141,9 +247,62 @@ public final class StatureConfig {
         return trampleDrops;
     }
 
+    /** A numeric tuning value, or its documented default when the key is unknown. */
+    public static synchronized float tuning(String key) {
+        return TUNING.getOrDefault(key, 1.0F);
+    }
+
+    /** The strength multiplier for one tuned channel. */
+    public static float channelStrength(String channelId) {
+        return tuning(tuningKey(channelId, "_strength"));
+    }
+
+    /** The lower clamp for one tuned channel. */
+    public static float channelMin(String channelId) {
+        return tuning(tuningKey(channelId, "_min"));
+    }
+
+    /** The upper clamp for one tuned channel. */
+    public static float channelMax(String channelId) {
+        return tuning(tuningKey(channelId, "_max"));
+    }
+
+    /** Whether this channel id has a min/max/strength family in the config. */
+    public static boolean isTunedChannel(String channelId) {
+        return TUNING.containsKey(tuningKey(channelId, "_min"));
+    }
+
+    /** A channel id's config key: the namespace is not part of the JSON key. */
+    private static String tuningKey(String channelId, String suffix) {
+        String key = channelId.startsWith("stature:")
+                ? channelId.substring("stature:".length())
+                : channelId;
+        return key + suffix;
+    }
+
+    /** The damage strength for projectiles, linear against the size factor. */
+    public static float projectileDamageStrength() {
+        return tuning("projectile_damage_strength");
+    }
+
+    /** The speed exponent for projectiles. */
+    public static float projectileSpeedStrength() {
+        return tuning("projectile_speed_strength");
+    }
+
+    /** Whether this id is one of the numeric tuning keys. */
+    public static synchronized boolean isTuningKey(String key) {
+        return TUNING.containsKey(key);
+    }
+
     /** A snapshot for packets: micro, macro, then the flags. */
     public static synchronized Map<String, Boolean> flagSnapshot() {
         return Map.copyOf(FLAGS);
+    }
+
+    /** A snapshot of the numeric tuning for packets. */
+    public static synchronized Map<String, Float> tuningSnapshot() {
+        return Map.copyOf(TUNING);
     }
 
     public static synchronized float microThreshold() {
@@ -170,14 +329,11 @@ public final class StatureConfig {
                 return stored;
             }
         }
-        Identifier frameId = FrameService.frameOf(entity);
-        if (frameId != null) {
-            FrameFile frame = StatureFrames.file(frameId);
-            if (frame != null) {
-                Boolean override = frame.thresholdFlags().get(mechanic);
-                if (override != null) {
-                    return override;
-                }
+        FrameFile frame = FrameService.frameFileOf(entity);
+        if (frame != null) {
+            Boolean override = frame.thresholdFlags().get(mechanic);
+            if (override != null) {
+                return override;
             }
         }
         synchronized (StatureConfig.class) {
@@ -227,7 +383,7 @@ public final class StatureConfig {
         if (frameId == null) {
             return null;
         }
-        FrameFile frame = StatureFrames.file(frameId);
+        FrameFile frame = FrameService.frameFileOf(entity);
         if (frame == null) {
             return null;
         }
@@ -340,6 +496,7 @@ public final class StatureConfig {
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity entity : level.getAllEntities()) {
                 if (entity instanceof LivingEntity living) {
+                    ((StatureScale) living).stature$clearFrameFileCache();
                     pushThresholds(living, StatureEvents.Cause.COMMAND);
                 }
             }
@@ -367,20 +524,12 @@ public final class StatureConfig {
     }
 
     private static Float frameThreshold(LivingEntity entity) {
-        Identifier frameId = FrameService.frameOf(entity);
-        if (frameId == null) {
-            return null;
-        }
-        FrameFile frame = StatureFrames.file(frameId);
+        FrameFile frame = FrameService.frameFileOf(entity);
         return frame == null ? null : frame.thresholdMicro();
     }
 
     private static Float frameMacro(LivingEntity entity) {
-        Identifier frameId = FrameService.frameOf(entity);
-        if (frameId == null) {
-            return null;
-        }
-        FrameFile frame = StatureFrames.file(frameId);
+        FrameFile frame = FrameService.frameFileOf(entity);
         return frame == null ? null : frame.thresholdMacro();
     }
 
@@ -404,7 +553,7 @@ public final class StatureConfig {
      * Merges one parsed file over the current values. Unknown keys are reported and skipped;
      * bad values keep their previous ones. Static and game-free so tests can drive it.
      */
-    static void apply(JsonObject json, String source) {
+    public static synchronized void apply(JsonObject json, String source) {
         float micro = number(json, "micro_threshold", microThreshold);
         float macro = number(json, "macro_threshold", macroThreshold);
         if (micro > 0.0F && macro > micro) {
@@ -413,6 +562,7 @@ public final class StatureConfig {
         } else {
             LOG.warn("config {} needs 0 < micro_threshold < macro_threshold; keeping previous edges", source);
         }
+        Map<String, Float> nextTuning = new LinkedHashMap<>(TUNING);
         for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
             String key = entry.getKey();
             if (key.equals("micro_threshold") || key.equals("macro_threshold")
@@ -420,6 +570,22 @@ public final class StatureConfig {
                 // "comment" is the one key earlier versions wrote into their own default file.
                 // It is accepted and ignored rather than reported, so an existing config does
                 // not log an unknown-key line on every start.
+                continue;
+            }
+            if (TUNING.containsKey(key)) {
+                JsonElement element = entry.getValue();
+                if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
+                    float value = element.getAsFloat();
+                    if (validTuning(key, value)) {
+                        nextTuning.put(key, value);
+                    } else {
+                        LOG.warn("config {} tuning \"{}\" must be within its allowed range; keeping {}",
+                                source, key, TUNING.get(key));
+                    }
+                } else {
+                    LOG.warn("config {} tuning \"{}\" must be a number; keeping {}",
+                            source, key, TUNING.get(key));
+                }
                 continue;
             }
             if (key.equals("trample_max_per_scan")) {
@@ -458,6 +624,34 @@ public final class StatureConfig {
                 LOG.warn("config {} flag \"{}\" must be true or false; keeping previous value", source, key);
             }
         }
+        if (validTuningRanges(nextTuning)) {
+            TUNING.clear();
+            TUNING.putAll(nextTuning);
+        } else {
+            LOG.warn("config {} has a tuning minimum above its maximum; keeping the previous tuning", source);
+        }
+    }
+
+    /** Whether one number is finite and within its declared bounds. */
+    private static boolean validTuning(String key, float value) {
+        Bound bound = BOUNDS.get(key);
+        return bound != null && Float.isFinite(value)
+                && value >= bound.min() && value <= bound.max();
+    }
+
+    /** Every min/max pair still satisfies min <= max. */
+    private static boolean validTuningRanges(Map<String, Float> values) {
+        for (Map.Entry<String, Float> entry : values.entrySet()) {
+            if (!entry.getKey().endsWith("_min")) {
+                continue;
+            }
+            String stem = entry.getKey().substring(0, entry.getKey().length() - 4);
+            Float max = values.get(stem + "_max");
+            if (max != null && entry.getValue() > max) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static float number(JsonObject json, String key, float fallback) {
@@ -484,7 +678,29 @@ public final class StatureConfig {
                           "trample_max_per_scan": 8,
                           "trample_drops": true,
                           "seismic_footsteps": true,
-                          "doorway_collision": true
+                          "doorway_collision": true,
+                          "projectile_scale": true,
+                          "projectile_scale_strength": 1.0,
+                          "projectile_scale_min": 0.25,
+                          "projectile_scale_max": 4.0,
+                          "projectile_damage_strength": 1.0,
+                          "projectile_speed_strength": 0.5,
+                          "item_pickup_range": true,
+                          "item_pickup_range_strength": 1.0,
+                          "item_pickup_range_min": 0.25,
+                          "item_pickup_range_max": 4.0,
+                          "riding_offset": true,
+                          "riding_offset_strength": 1.0,
+                          "riding_offset_min": 0.25,
+                          "riding_offset_max": 4.0,
+                          "explosion_scale": true,
+                          "explosion_scale_strength": 1.0,
+                          "explosion_scale_min": 0.25,
+                          "explosion_scale_max": 3.0,
+                          "drops_scale": true,
+                          "drops_scale_strength": 1.0,
+                          "drops_scale_min": 1.0,
+                          "drops_scale_max": 3.0
                         }
                         """);
             }

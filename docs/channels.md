@@ -15,7 +15,7 @@ value = override, else basis ^ exponent
 The basis is usually the uniform scale. Body-physics channels follow it so reach, step, motion,
 jump and flight feel proportional. Combat, defence, health, AI ranges and physics constants do not
 follow, because vanilla already scales what needs scaling and following would double-apply it or
-clamp it into nonsense. Stature has 43 built-in channels; a mod may declare more, and any id
+clamp it into nonsense. Stature has 48 built-in channels; a mod may declare more, and any id
 outside the `stature:` namespace is experimental.
 
 ## Taxonomy
@@ -23,6 +23,7 @@ outside the `stature:` namespace is experimental.
 | Kind | Channels | Default |
 |---|---|---|
 | Body physics | `reach_block`, `reach_entity`, `step_height`, `motion`, `jump`, `flying_speed`, `safe_fall_distance` | Follows the scale with a tuned exponent |
+| Physical extras | `projectile_scale`, `item_pickup_range`, `riding_offset`, `explosion_scale`, `drops_scale` | Follows the scale; the server config also gives each a switch, a strength and min/max clamps |
 | Combat, defence, health, AI ranges | `attack`, `attack_speed`, `attack_knockback`, `sweeping_damage`, `defense`, `armor_toughness`, `knockback_resistance`, `explosion_knockback_resistance`, `health`, `absorption`, `luck`, `oxygen_bonus`, `follow_range`, `tempt_range`, `burning_time`, `mining_speed`, `submerged_mining_speed`, `mining_efficiency` | Off until overridden |
 | Physics constants | `gravity`, `friction`, `air_drag`, `bounciness`, `fall_damage`, `movement_efficiency`, `water_movement_efficiency`, `sneaking_speed` | Off until overridden |
 | Already scaled by vanilla | `camera_distance` | Off; an override bends the vanilla result further |
@@ -80,6 +81,68 @@ overridden. The exponent is what the basis is raised to.
 | `stature:visibility` | NONE | 1.0 | Hides the model, name tag and shadow below 0.5 |
 | `stature:held_item` | NONE | 1.0 | The held item, scaled around the hand |
 | `stature:shadow` | NONE | 1.0 | Shadow radius, on top of vanilla's own scale follow |
+| `stature:projectile_scale` | BASE | 1.0 | Arrows, tridents, fireballs, potions, spit and other projectiles fired by this entity |
+| `stature:item_pickup_range` | BASE | 1.0 | The extra reach of the item and experience pickup scan |
+| `stature:riding_offset` | BASE | 1.0 | The seat scale a mount passes to its passenger attachment |
+| `stature:explosion_scale` | BASE | 0.5 | The radius of explosions this entity caused |
+| `stature:drops_scale` | BASE | 0.5 | The count of loot-table stacks this entity drops |
+
+## Physical extras
+
+These five channels are applied by Stature itself rather than by a vanilla attribute. They still
+use the normal override system, the normal save and sync, and the normal config gate. Their
+numeric tuning lives in [[stature:thresholds#the-m10-channel-options|the config file]].
+
+### Projectiles
+
+A projectile takes a snapshot of its shooter's `projectile_scale` when it learns its owner, so one
+hook covers arrows, tridents, fireballs, potions, snowballs, llama spit and modded projectiles.
+The snapshot means a deflected projectile keeps the size and speed it was fired with.
+
+- The hitbox grows uniformly with the factor.
+- Damage grows linearly: `1 + (factor - 1) * projectile_damage_strength`.
+- Launch speed grows by `factor ^ projectile_speed_strength`; the default exponent 0.5 makes a
+  4x arrow fly twice as fast.
+- The factor is saved with the projectile, so an unloaded chunk does not shrink it.
+- Explosion damage is not multiplied by this channel; the explosion channel owns that radius.
+
+### Pickup reach
+
+The player's existing item and experience scan is enlarged by the factor. Vanilla inflates the
+player's box by 1 block horizontally and 0.5 vertically; the channel scales that inflation, so the
+body box itself never becomes the pickup area. A small factor shrinks the extra reach but never
+below the body. The scan still runs once per tick, client scans stay vanilla, and no second query
+is added.
+
+### Riding offsets
+
+Vanilla already passes a living mount's own scale to its passenger attachment calculation. This
+channel lets a pack or an operator change that seat scale per mount. The value is the factor
+divided by the mount's uniform scale, so the default 1.0 is an exact no-op. Raising it on a normal
+horse stops a giant rider from sinking into it; lowering it does the opposite. The channel belongs
+to the mount.
+
+### Explosions
+
+An explosion caused by a creeper, a ghast fireball, or TNT primed by a living entity uses that
+entity's factor. The cause is resolved with vanilla's own rule: a projectile through its owner and
+primed TNT through the entity that lit it. TNT lit by redstone has no living cause and stays
+vanilla rather than being guessed from proximity. The radius is multiplied before the explosion is
+constructed, so the server calculation and the packet that draws the particles and sound agree.
+
+### Drops
+
+Only loot-table drops are touched. Equipment, inventory contents and custom death drops do not
+pass through the loot-table consumer and are left alone. The count of each generated stack is
+multiplied, never re-rolled: luck, looting, the loot seed and conditions produce exactly the
+vanilla roll.
+
+- Only stackable items are scaled. An item whose maximum stack size is one, such as a sword or a
+  saddle, is never duplicated.
+- A result above the item's stack size is split into several stacks with the original components.
+- The count never drops below vanilla, so a small entity does not get less loot.
+- The default exponent 0.5 and config maximum 3.0 mean a 16x entity drops at most three times the
+  vanilla count.
 
 ## What an override means
 
@@ -94,6 +157,11 @@ For a multiplier channel such as the knockback pair or `saturation`, the overrid
 multiplier itself. A negative or non-finite override degrades to neutral rather than poisoning
 physics. `knockback_received` and `knockback_dealt` are read at the game's knockback funnels, so
 enchantments and knockback resistance still apply underneath.
+
+For the five physical extras, the override is the factor itself. The global strength multiplier
+applies only to the followed value, not to an explicit override; the config min/max clamp applies
+to both, because it is a hitbox and explosion safety bound. A disabled channel returns exactly
+1.0 even if an override is stored, and the override survives for when it is re-enabled.
 
 For a render channel, the override is read when the entity is drawn:
 
@@ -122,12 +190,31 @@ different reason: making them follow would leave a small entity's name visible o
 distance, which is a stealth design rather than a size rule. `shadow` is off because vanilla
 already scales the shadow with the entity, so the channel only bends it further.
 
+## Frames and channels
+
+A frame may carry a `channels` object that sets any declared channel for the entities it sizes:
+
+```json
+{
+  "size": [1.2, 3.6],
+  "channels": {
+    "stature:projectile_scale": 2.0,
+    "stature:explosion_scale": 1.5
+  }
+}
+```
+
+The values are ordinary overrides, eased with the frame's easing. Clearing the frame removes the
+overrides it introduced, unless an operator changed one of them after the frame was applied; that
+later choice is left alone. A channel an operator sets after the frame is just a normal override.
+
 ## Commands
 
 ```cmd
 /stature channel @s list
 /stature channel @s stature:motion 0.5
 /stature channel @s stature:attack 2
+/stature channel @s stature:projectile_scale 2
 /stature channel @s stature:attack reset
 ```
 

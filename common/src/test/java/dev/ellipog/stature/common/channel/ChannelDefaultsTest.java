@@ -68,6 +68,11 @@ class ChannelDefaultsTest {
             new Row("stature:visibility", ChannelFollow.NONE, 1.0),
             new Row("stature:held_item", ChannelFollow.NONE, 1.0),
             new Row("stature:shadow", ChannelFollow.NONE, 1.0),
+            new Row("stature:projectile_scale", ChannelFollow.BASE, 1.0),
+            new Row("stature:item_pickup_range", ChannelFollow.BASE, 1.0),
+            new Row("stature:riding_offset", ChannelFollow.BASE, 1.0),
+            new Row("stature:explosion_scale", ChannelFollow.BASE, 0.5),
+            new Row("stature:drops_scale", ChannelFollow.BASE, 0.5),
     };
 
     @Test

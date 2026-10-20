@@ -16,6 +16,7 @@ import com.google.gson.JsonParser;
 import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.FrameSpec;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.channel.ChannelRegistry;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -57,7 +58,7 @@ public final class FrameCodec {
     /** Fields this build understands. Anything else is reported once per file. */
     private static final Set<String> KNOWN = Set.of(
             "size", "scale", "eye_height", "easing", "entities", "entity_tags",
-            "rig", "parts", "hitbox_from_parts", "regions", "thresholds",
+            "rig", "parts", "hitbox_from_parts", "regions", "channels", "thresholds",
             "first_person_arms", "comment", "$schema");
 
     /** Conventionally a schema pointer or prose, and never a frame's business. */
@@ -105,6 +106,7 @@ public final class FrameCodec {
         Map<String, List<Float>> parts = parts(source, json);
         boolean hitboxFromParts = optionalFlag(source, json, "hitbox_from_parts");
         List<FrameRegion> regions = regions(source, json);
+        Map<String, Float> channels = channels(source, json);
         Thresholds thresholds = thresholds(source, json);
         Boolean firstPersonArms = optionalFlagBoxed(source, json, "first_person_arms");
 
@@ -122,7 +124,7 @@ public final class FrameCodec {
 
         try {
             return new FrameFile(id, new FrameSpec(scale, size[0], size[1], size[2], eyeHeight, easing),
-                    entities, tags, rig, parts, hitboxFromParts, regions,
+                    entities, tags, rig, parts, hitboxFromParts, regions, channels,
                     thresholds.micro(), thresholds.macro(), thresholds.flags(), firstPersonArms);
         } catch (IllegalArgumentException e) {
             throw new FrameFormatException(source + ": " + e.getMessage(), e);
@@ -309,6 +311,39 @@ public final class FrameCodec {
             parts.put(entry.getKey(), List.copyOf(factors));
         }
         return Map.copyOf(parts);
+    }
+
+    /**
+     * Channel overrides, or empty when absent. A frame can set any declared channel, exactly as
+     * {@code /stature channel} does; an unknown id is reported and skipped rather than failing the
+     * whole file, matching the tolerant treatment of the other optional fields.
+     */
+    private static Map<String, Float> channels(String source, JsonObject json) throws FrameFormatException {
+        JsonElement element = json.get("channels");
+        if (element == null || element.isJsonNull()) {
+            return Map.of();
+        }
+        if (!element.isJsonObject()) {
+            throw new FrameFormatException(source + ": \"channels\" must be an object of id to number, got "
+                    + kindOf(element));
+        }
+        Map<String, Float> channels = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+            String id = entry.getKey().trim();
+            if (ChannelRegistry.instance().get(id) == null) {
+                StatureFrames.LOG.info("{}: ignoring unknown channel \"{}\"", source, id);
+                continue;
+            }
+            if (!entry.getValue().isJsonPrimitive() || !entry.getValue().getAsJsonPrimitive().isNumber()) {
+                throw new FrameFormatException(source + ": channel \"" + id + "\" must be a number");
+            }
+            float value = entry.getValue().getAsFloat();
+            if (!Float.isFinite(value)) {
+                throw new FrameFormatException(source + ": channel \"" + id + "\" must be finite");
+            }
+            channels.put(id, value);
+        }
+        return Map.copyOf(channels);
     }
 
     /**

@@ -108,7 +108,8 @@ public final class StatureNeoForge {
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
             if (event.getEntity() instanceof ServerPlayer player) {
                 StatureNetworking.sendConfigTo(player,
-                        StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot());
+                        StatureConfig.microThreshold(), StatureConfig.macroThreshold(),
+                        StatureConfig.flagSnapshot(), StatureConfig.tuningSnapshot());
             }
         });
 

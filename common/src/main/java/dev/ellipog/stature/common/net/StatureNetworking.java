@@ -109,9 +109,11 @@ public final class StatureNetworking {
         }
     }
 
-    public static void sendConfigTo(ServerPlayer player, float micro, float macro, Map<String, Boolean> flags) {
+    public static void sendConfigTo(
+            ServerPlayer player, float micro, float macro,
+            Map<String, Boolean> flags, Map<String, Float> tuning) {
         if (installed != null) {
-            installed.sendTo(player, new ConfigPayload(micro, macro, flags));
+            installed.sendTo(player, new ConfigPayload(micro, macro, flags, tuning));
         }
     }
 

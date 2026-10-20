@@ -123,7 +123,8 @@ public final class StatureFabric implements ModInitializer {
         // Movement gating must agree on both sides, so each login carries the tiers and flags.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 StatureNetworking.sendConfigTo(handler.getPlayer(),
-                        StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot()));
+                        StatureConfig.microThreshold(), StatureConfig.macroThreshold(),
+                        StatureConfig.flagSnapshot(), StatureConfig.tuningSnapshot()));
 
         // The §16 handshake. Each join is asked; the answer removes it from the pending
         // map, and the tick check below refuses whatever never answered. Vanilla peers

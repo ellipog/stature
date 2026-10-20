@@ -23,15 +23,20 @@ class ConfigPayloadTest {
 
     @Test
     void valuesSurviveTheWire() {
-        ConfigPayload decoded = roundTrip(new ConfigPayload(0.5F, 1.5F, Map.of("trampling", false)));
+        ConfigPayload decoded = roundTrip(new ConfigPayload(
+                0.5F, 1.5F, Map.of("trampling", false),
+                Map.of("projectile_scale_max", 4.0F)));
         assertEquals(0.5F, decoded.micro());
         assertEquals(1.5F, decoded.macro());
         assertEquals(Map.of("trampling", false), decoded.flags());
+        assertEquals(Map.of("projectile_scale_max", 4.0F), decoded.tuning());
     }
 
     @Test
     void anEmptyMapSurvivesTheWire() {
-        assertTrue(roundTrip(new ConfigPayload(0.25F, 2.5F, Map.of())).flags().isEmpty());
+        ConfigPayload decoded = roundTrip(new ConfigPayload(0.25F, 2.5F, Map.of(), Map.of()));
+        assertTrue(decoded.flags().isEmpty());
+        assertTrue(decoded.tuning().isEmpty());
     }
 
     @Test

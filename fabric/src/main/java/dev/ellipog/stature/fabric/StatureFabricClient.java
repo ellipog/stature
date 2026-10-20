@@ -87,7 +87,7 @@ public final class StatureFabricClient implements ClientModInitializer {
                 }));
         ClientPlayNetworking.registerGlobalReceiver(ConfigPayload.TYPE, (payload, context) ->
                 context.client().execute(() -> StatureConfig.applySynced(
-                        payload.micro(), payload.macro(), payload.flags())));
+                        payload.micro(), payload.macro(), payload.flags(), payload.tuning())));
         ClientPlayNetworking.registerGlobalReceiver(FootstepPayload.TYPE, (payload, context) ->
                 context.client().execute(() -> {
                     Vec3 camera = ClientViews.cameraPosition();
