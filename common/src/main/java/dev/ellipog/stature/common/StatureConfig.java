@@ -1,18 +1,15 @@
 package dev.ellipog.stature.common;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+
+import dev.ellipog.armature.api.config.ArmatureConfig;
+import dev.ellipog.armature.api.data.DataProblem;
 
 import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.frame.FrameFile;
@@ -45,6 +42,47 @@ public final class StatureConfig {
     private static final Logger LOG = LoggerFactory.getLogger("stature");
 
     private static final String FILE_NAME = "stature.json";
+
+    /**
+     * The file written on first start. The keys, their order and their values are the format;
+     * Armature's config reader writes this text once and never rewrites a file it did not write.
+     */
+    private static final String DEFAULT_JSON = """
+            {
+              "micro_threshold": 0.25,
+              "macro_threshold": 2.5,
+              "porous_traversal": true,
+              "surface_climbing": true,
+              "amplified_knockback": true,
+              "trampling": true,
+              "trample_max_per_scan": 8,
+              "trample_drops": true,
+              "seismic_footsteps": true,
+              "doorway_collision": true,
+              "projectile_scale": true,
+              "projectile_scale_strength": 1.0,
+              "projectile_scale_min": 0.25,
+              "projectile_scale_max": 4.0,
+              "projectile_damage_strength": 1.0,
+              "projectile_speed_strength": 0.5,
+              "item_pickup_range": true,
+              "item_pickup_range_strength": 1.0,
+              "item_pickup_range_min": 0.25,
+              "item_pickup_range_max": 4.0,
+              "riding_offset": true,
+              "riding_offset_strength": 1.0,
+              "riding_offset_min": 0.0625,
+              "riding_offset_max": 16.0,
+              "explosion_scale": true,
+              "explosion_scale_strength": 1.0,
+              "explosion_scale_min": 0.25,
+              "explosion_scale_max": 3.0,
+              "drops_scale": true,
+              "drops_scale_strength": 1.0,
+              "drops_scale_min": 1.0,
+              "drops_scale_max": 3.0
+            }
+            """;
 
     /** Mechanic flag keys, shared by the file, frames and gates. */
     public static final String POROUS_TRAVERSAL = "porous_traversal";
@@ -163,9 +201,6 @@ public final class StatureConfig {
     /** Loads (or creates, then loads) the config in this directory. Returns the path used. */
     public static synchronized Path load(Path configDir) {
         file = configDir.resolve(FILE_NAME);
-        if (!Files.isRegularFile(file)) {
-            writeDefaults();
-        }
         read();
         return file;
     }
@@ -536,20 +571,16 @@ public final class StatureConfig {
         return frame == null ? null : frame.thresholdMacro();
     }
 
+    /** Reads the file through Armature's config reader, keeping previous values on failure. */
     private static void read() {
-        JsonObject json;
-        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            JsonElement root = JsonParser.parseReader(reader);
-            if (!root.isJsonObject()) {
-                LOG.warn("config {} is not an object; keeping previous values", file);
-                return;
+        ArmatureConfig.Document document = ArmatureConfig.document(file, DEFAULT_JSON);
+        if (!document.usable()) {
+            for (DataProblem problem : document.problems().all()) {
+                LOG.warn(problem.render());
             }
-            json = root.getAsJsonObject();
-        } catch (IOException | RuntimeException e) {
-            LOG.warn("config {} could not be read ({}); keeping previous values", file, e.toString());
             return;
         }
-        apply(json, file.toString());
+        apply(document.values());
     }
 
     /**
@@ -557,76 +588,56 @@ public final class StatureConfig {
      * bad values keep their previous ones. Static and game-free so tests can drive it.
      */
     public static synchronized void apply(JsonObject json, String source) {
-        float micro = number(json, "micro_threshold", microThreshold);
-        float macro = number(json, "macro_threshold", macroThreshold);
+        apply(ArmatureConfig.values(json, source));
+    }
+
+    private static synchronized void apply(ArmatureConfig.Values values) {
+        String source = values.name();
+
+        // Absent keys and bad values both fall back to the previous edge. The pair is validated
+        // together, so one good edge and one broken one cannot leave an inverted band.
+        float micro = values.number("micro_threshold", 0.0F, Float.MAX_VALUE).orElse(microThreshold);
+        float macro = values.number("macro_threshold", 0.0F, Float.MAX_VALUE).orElse(macroThreshold);
         if (micro > 0.0F && macro > micro) {
             microThreshold = micro;
             macroThreshold = macro;
         } else {
             LOG.warn("config {} needs 0 < micro_threshold < macro_threshold; keeping previous edges", source);
         }
+
         Map<String, Float> nextTuning = new LinkedHashMap<>(TUNING);
-        for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
-            String key = entry.getKey();
-            if (key.equals("micro_threshold") || key.equals("macro_threshold")
-                    || key.equals("comment")) {
-                // "comment" is the one key earlier versions wrote into their own default file.
-                // It is accepted and ignored rather than reported, so an existing config does
-                // not log an unknown-key line on every start.
-                continue;
-            }
-            if (TUNING.containsKey(key)) {
-                JsonElement element = entry.getValue();
-                if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
-                    float value = element.getAsFloat();
-                    if (validTuning(key, value)) {
-                        nextTuning.put(key, value);
-                    } else {
-                        LOG.warn("config {} tuning \"{}\" must be within its allowed range; keeping {}",
-                                source, key, TUNING.get(key));
-                    }
-                } else {
-                    LOG.warn("config {} tuning \"{}\" must be a number; keeping {}",
-                            source, key, TUNING.get(key));
-                }
-                continue;
-            }
-            if (key.equals("trample_max_per_scan")) {
-                if (entry.getValue().isJsonPrimitive()
-                        && entry.getValue().getAsJsonPrimitive().isNumber()) {
-                    double raw = entry.getValue().getAsDouble();
-                    if (raw >= 1.0 && raw == Math.rint(raw) && raw <= Integer.MAX_VALUE) {
-                        trampleMaxPerScan = (int) raw;
-                    } else {
-                        LOG.warn("config {} needs a whole trample_max_per_scan >= 1; keeping {}",
-                                source, trampleMaxPerScan);
-                    }
-                } else {
-                    LOG.warn("config {} trample_max_per_scan must be a whole number; keeping {}",
-                            source, trampleMaxPerScan);
-                }
-                continue;
-            }
-            if (key.equals("trample_drops")) {
-                if (entry.getValue().isJsonPrimitive()
-                        && entry.getValue().getAsJsonPrimitive().isBoolean()) {
-                    trampleDrops = entry.getValue().getAsBoolean();
-                } else {
-                    LOG.warn("config {} trample_drops must be true or false; keeping {}",
-                            source, trampleDrops);
-                }
-                continue;
-            }
-            if (!FLAGS.containsKey(key)) {
+        for (Map.Entry<String, Bound> entry : BOUNDS.entrySet()) {
+            Bound bound = entry.getValue();
+            values.number(entry.getKey(), bound.min(), bound.max())
+                    .ifPresent(value -> nextTuning.put(entry.getKey(), value));
+        }
+        values.integer("trample_max_per_scan", 1, Integer.MAX_VALUE)
+                .ifPresent(value -> trampleMaxPerScan = value);
+        values.bool("trample_drops").ifPresent(value -> trampleDrops = value);
+        for (String key : FLAGS.keySet()) {
+            values.bool(key).ifPresent(value -> FLAGS.put(key, value));
+        }
+
+        Set<String> known = new LinkedHashSet<>(FLAGS.keySet());
+        known.addAll(TUNING.keySet());
+        known.add("micro_threshold");
+        known.add("macro_threshold");
+        known.add("trample_max_per_scan");
+        known.add("trample_drops");
+        // "comment" is the one key earlier versions wrote into their own default file. It is
+        // accepted and ignored rather than reported, so an existing config does not log an
+        // unknown-key line on every start.
+        known.add("comment");
+        for (String key : values.keys()) {
+            if (!known.contains(key)) {
                 LOG.info("{}: ignoring unknown threshold key \"{}\"", source, key);
-                continue;
-            }
-            if (entry.getValue().isJsonPrimitive() && entry.getValue().getAsJsonPrimitive().isBoolean()) {
-                FLAGS.put(key, entry.getValue().getAsBoolean());
-            } else {
-                LOG.warn("config {} flag \"{}\" must be true or false; keeping previous value", source, key);
             }
         }
+
+        for (DataProblem problem : values.problems().all()) {
+            LOG.warn(problem.render());
+        }
+
         if (validTuningRanges(nextTuning)) {
             TUNING.clear();
             TUNING.putAll(nextTuning);
@@ -655,60 +666,5 @@ public final class StatureConfig {
             }
         }
         return true;
-    }
-
-    private static float number(JsonObject json, String key, float fallback) {
-        JsonElement element = json.get(key);
-        if (element == null || !element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber()) {
-            return fallback;
-        }
-        float value = element.getAsFloat();
-        return Float.isFinite(value) ? value : fallback;
-    }
-
-    private static void writeDefaults() {
-        try {
-            Files.createDirectories(file.getParent());
-            try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
-                writer.write("""
-                        {
-                          "micro_threshold": 0.25,
-                          "macro_threshold": 2.5,
-                          "porous_traversal": true,
-                          "surface_climbing": true,
-                          "amplified_knockback": true,
-                          "trampling": true,
-                          "trample_max_per_scan": 8,
-                          "trample_drops": true,
-                          "seismic_footsteps": true,
-                          "doorway_collision": true,
-                          "projectile_scale": true,
-                          "projectile_scale_strength": 1.0,
-                          "projectile_scale_min": 0.25,
-                          "projectile_scale_max": 4.0,
-                          "projectile_damage_strength": 1.0,
-                          "projectile_speed_strength": 0.5,
-                          "item_pickup_range": true,
-                          "item_pickup_range_strength": 1.0,
-                          "item_pickup_range_min": 0.25,
-                          "item_pickup_range_max": 4.0,
-                          "riding_offset": true,
-                          "riding_offset_strength": 1.0,
-                          "riding_offset_min": 0.0625,
-                          "riding_offset_max": 16.0,
-                          "explosion_scale": true,
-                          "explosion_scale_strength": 1.0,
-                          "explosion_scale_min": 0.25,
-                          "explosion_scale_max": 3.0,
-                          "drops_scale": true,
-                          "drops_scale_strength": 1.0,
-                          "drops_scale_min": 1.0,
-                          "drops_scale_max": 3.0
-                        }
-                        """);
-            }
-        } catch (IOException e) {
-            LOG.warn("config {} could not be created: {}", file, e.toString());
-        }
     }
 }
