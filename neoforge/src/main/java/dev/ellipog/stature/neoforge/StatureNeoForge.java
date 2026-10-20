@@ -1,12 +1,9 @@
 package dev.ellipog.stature.neoforge;
 
 import dev.ellipog.stature.api.Stature;
-import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StaturePlatform;
-import dev.ellipog.stature.common.client.CameraTrauma;
-import dev.ellipog.stature.common.client.ClientViews;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -24,9 +21,7 @@ import dev.ellipog.stature.common.net.ThresholdsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.phys.Vec3;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -47,10 +42,11 @@ import org.slf4j.LoggerFactory;
  * the constructor receives: NeoForge splits them, and putting either on the wrong one produces a
  * silent no-op rather than an error.
  *
- * <p>The packet handler is deliberately written without a single client class. It asks the context
- * for the player, then for that player's level and the entity by id, which is the same code on both
- * sides -- so the class can stay in the common payload rather than needing a client-only twin, and a
- * dedicated server never verifies a class it cannot load.
+ * <p>The payload <b>types and codecs</b> are registered here, on both sides. The client-bound
+ * <b>handlers</b> are registered in {@code NeoForgeStatureClientPayloads} through
+ * {@code RegisterClientPayloadHandlersEvent}, which only fires on a client: a dedicated server never
+ * classloads that class, so a handler cannot pull {@code ClientViews} (and {@code Minecraft}) onto
+ * the server through a lambda.
  */
 @Mod(Stature.MOD_ID)
 public final class StatureNeoForge {
@@ -66,49 +62,13 @@ public final class StatureNeoForge {
         StatureNetworking.install(new NeoForgeStatureNetwork());
         StaturePlatform.install(new NeoForgeStaturePlatform());
 
-        modEventBus.addListener((RegisterPayloadHandlersEvent event) ->
-                event.registrar("1").playToClient(AxesPayload.TYPE, AxesPayload.STREAM_CODEC,
-                        (payload, context) -> context.enqueueWork(() -> {
-                            Entity entity = context.player().level().getEntity(payload.entityId());
-                            if (entity instanceof LivingEntity living) {
-                                ScaleService.applyFromServer(living, payload.state(), payload.eyeHeight());
-                            }
-                        })).playToClient(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC,
-                        (payload, context) -> context.enqueueWork(() -> {
-                            Entity entity = context.player().level().getEntity(payload.entityId());
-                            if (entity instanceof LivingEntity living) {
-                                StatureScale duck = (StatureScale) living;
-                                duck.stature$channelOverrides().clear();
-                                duck.stature$channelOverrides().putAll(payload.channels());
-                            }
-                        })).playToClient(PartsPayload.TYPE, PartsPayload.STREAM_CODEC,
-                        (payload, context) -> context.enqueueWork(() -> {
-                            Entity entity = context.player().level().getEntity(payload.entityId());
-                            if (entity instanceof LivingEntity living) {
-                                StatureScale duck = (StatureScale) living;
-                                duck.stature$partFactors().clear();
-                                duck.stature$partFactors().putAll(payload.parts());
-                                duck.stature$setFirstPersonVanilla(payload.firstPersonVanilla());
-                            }
-                        })).playToClient(ThresholdsPayload.TYPE, ThresholdsPayload.STREAM_CODEC,
-                        (payload, context) -> context.enqueueWork(() -> {
-                            Entity entity = context.player().level().getEntity(payload.entityId());
-                            if (entity instanceof LivingEntity living) {
-                                ((StatureScale) living).stature$setThresholds(
-                                        new ResolvedThresholds(payload.micro(), payload.macro(), payload.flags()));
-                            }
-                        })).playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC,
-                        (payload, context) -> context.enqueueWork(() -> StatureConfig.applySynced(
-                                payload.micro(), payload.macro(), payload.flags())))
-                        .playToClient(FootstepPayload.TYPE, FootstepPayload.STREAM_CODEC,
-                        (payload, context) -> context.enqueueWork(() -> {
-                            Vec3 camera = ClientViews.cameraPosition();
-                            if (camera != null) {
-                                CameraTrauma.addShake(
-                                        payload.x(), payload.y(), payload.z(), payload.scale(), camera,
-                                        ClientViews.screenEffectScale());
-                            }
-                        })));
+        modEventBus.addListener((RegisterPayloadHandlersEvent event) -> event.registrar("1")
+                .playToClient(AxesPayload.TYPE, AxesPayload.STREAM_CODEC)
+                .playToClient(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC)
+                .playToClient(PartsPayload.TYPE, PartsPayload.STREAM_CODEC)
+                .playToClient(ThresholdsPayload.TYPE, ThresholdsPayload.STREAM_CODEC)
+                .playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC)
+                .playToClient(FootstepPayload.TYPE, FootstepPayload.STREAM_CODEC));
 
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) ->
                 StatureCommands.register(event.getDispatcher()));

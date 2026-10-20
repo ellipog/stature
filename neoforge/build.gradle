@@ -26,14 +26,6 @@ neoForge {
             type = 'gameTestServer'
             systemProperty 'stature.gametest', 'true'
         }
-        data {
-            data()
-
-            // DataGen can be run by - "./gradlew :neoforge:runData" in Terminal.
-            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
-
-        }
         server {
             server()
         }
@@ -45,7 +37,8 @@ neoForge {
     }
 }
 
-sourceSets.main.resources { srcDir 'src/generated/resources' }
+// No datagen run: Stature ships no generated resources, and the M5 damage-type JSON is
+// hand-written data rather than output.
 
 dependencies {
     // :api is on the compile classpath here, and its classes ride inside this jar (see

@@ -151,7 +151,8 @@ public final class ScaleService {
         }
         duck.stature$setDisplacementHurt(true);
         if (level instanceof ServerLevel serverLevel) {
-            entity.hurtOrSimulate(StatureDamageTypes.compression(serverLevel), 2.0F);
+            // hurtServer is the non-deprecated half of hurtOrSimulate, and this branch is the server.
+            entity.hurtServer(serverLevel, StatureDamageTypes.compression(serverLevel), 2.0F);
         }
     }
 

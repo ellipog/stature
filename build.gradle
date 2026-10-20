@@ -12,16 +12,35 @@ plugins {
 // ---------------------------------------------------------------------------
 // Local test deploy.
 //
-// Copies the built jars straight into the Modrinth App profiles named in
-// gradle.properties, so testing is one command. Each task deletes the previous
-// copies first -- otherwise an old jar sits next to the new one and Minecraft
-// loads whichever it happens to pick.
+// Copies the built jars straight into the Modrinth App profiles named by
+// testModsDirFabric / testModsDirNeoForge, so testing is one command. Each task
+// deletes the previous copies first -- otherwise an old jar sits next to the new
+// one and Minecraft loads whichever it happens to pick.
+//
+// The destinations are machine paths, so they are not in gradle.properties: they
+// come from local.properties (gitignored) or from a -P property, never from a
+// committed file. CI runs `build` and never needs either.
 // ---------------------------------------------------------------------------
 
 def archivePrefix = mod_id
 
+// A -P property wins over local.properties, so a one-off run can point somewhere else.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.isFile()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+def deployProperty = { String name ->
+    def value = project.findProperty(name)
+    if (value == null) {
+        value = localProperties.getProperty(name)
+    }
+    return value == null ? null : value.toString().trim()
+}
+
 def registerDeploy = { String taskName, String subproject, String jarTask, String dirProperty ->
-    def configured = project.findProperty(dirProperty)
+    def configured = deployProperty(dirProperty)
     def sub = project.project(":${subproject}")
 
     tasks.register(taskName) {
@@ -31,7 +50,9 @@ def registerDeploy = { String taskName, String subproject, String jarTask, Strin
 
         doLast {
             if (configured == null) {
-                throw new GradleException("${dirProperty} is not set in gradle.properties")
+                throw new GradleException("${dirProperty} is not set. Add it to local.properties " +
+                        "at the repository root (gitignored), or pass -P${dirProperty}=C:/path/to/mods. " +
+                        "See the note under '# Local test profiles' in gradle.properties.")
             }
 
             // Resolved here rather than where the task is registered, and that is not tidiness. This

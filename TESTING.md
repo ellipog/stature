@@ -7,9 +7,8 @@ world. The last-verified column stays blank until a person has run the row.
 
 ## Prerequisites
 
-- JDK 25.
-- `gradle.properties` pins `org.gradle.java.home` to a Windows path. On another machine, override
-  it in `~/.gradle/gradle.properties` rather than editing the tracked file.
+- JDK 25. The wrapper's daemon JVM criteria (`gradle/gradle-daemon-jvm.properties`) selects it, so
+  no machine path is committed.
 - Windows: `.\gradlew.bat`. Unix: `./gradlew` (`git update-index --chmod=+x gradlew` if the
   executable bit was lost).
 - The Fabric gametest run accepts the Minecraft EULA for its own run directory. The NeoForge

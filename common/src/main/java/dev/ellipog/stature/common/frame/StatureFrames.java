@@ -124,7 +124,8 @@ public final class StatureFrames {
      */
     public static Optional<FrameAssignments.Selection> declaredFor(EntityType<?> entityType) {
         Identifier typeId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
-        Set<Identifier> tagIds = entityType.builtInRegistryHolder().tags().map(TagKey::location).collect(Collectors.toUnmodifiableSet());
+        Set<Identifier> tagIds = BuiltInRegistries.ENTITY_TYPE.wrapAsHolder(entityType).tags()
+                .map(TagKey::location).collect(Collectors.toUnmodifiableSet());
         return FrameAssignments.automatic(typeId, tagIds, registry.assignments());
     }
 

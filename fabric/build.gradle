@@ -17,8 +17,9 @@ dependencies {
 
 loom {
     // No `mixin` block: Loom 1.17 disabled the mixin annotation processor by default and says to
-    // remove the configuration. Nothing is lost on 26.x, which is unobfuscated: spike-s2/ proved
-    // mixins apply with no refmap at all, because there are no obfuscated names to map back.
+    // remove the configuration. Nothing is lost on 26.x, which is unobfuscated: the Spike S2
+    // experiment proved mixins apply with no refmap at all, because there are no obfuscated names
+    // to map back.
     // If a refmap is ever genuinely needed, that is `useLegacyMixinAp = true`, not this block.
     runs {
         client {

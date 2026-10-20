@@ -28,9 +28,9 @@ Rebuilt; see [compatibility](docs/compatibility.md).
 .\gradlew.bat build
 ```
 
-On Unix, `./gradlew build`. JDK 25 is required. `gradle.properties` pins `org.gradle.java.home` to a
-Windows path; override it in `~/.gradle/gradle.properties` on another machine rather than editing
-the tracked file.
+On Unix, `./gradlew build`. JDK 25 is required. The wrapper's daemon JVM is declared in
+`gradle/gradle-daemon-jvm.properties` (Gradle's daemon JVM criteria), so an installed JDK 25 is
+found rather than a machine path being committed.
 
 The build runs the game-free unit tests and the Fabric server gametests. The NeoForge gametest and
 the Fabric client gametest are separate commands, documented in [TESTING.md](TESTING.md).
@@ -40,8 +40,9 @@ the Fabric client gametest are separate commands, documented in [TESTING.md](TES
 .\gradlew.bat deployNeoForge
 ```
 
-copies the built jar into the test profiles named in `gradle.properties`, removing the previous
-copies first.
+copies the built jar into the test profiles named in `local.properties` (gitignored), removing the
+previous copies first. Set `testModsDirFabric` and `testModsDirNeoForge` there, or pass them with
+`-P`.
 
 ## Documentation
 

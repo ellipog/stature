@@ -9,8 +9,8 @@ import net.minecraft.world.phys.Vec3;
  * <p>Vanilla builds a square footprint: one width for X and Z
  * ({@code EntityDimensions.makeBoundingBox}). A rectangular one is pure arithmetic on a position,
  * which needs no level, no registries and no loader -- so it lives here rather than behind a
- * mixin, and the mixin that will call it only supplies the numbers. Proved by the spike
- * ({@code spike-s2/}) and pinned by the test beside this file.
+ * mixin, and the mixin that will call it only supplies the numbers. Proved by the Spike S2
+ * experiment and pinned by the test beside this file.
  */
 public final class BoundingBoxes {
 

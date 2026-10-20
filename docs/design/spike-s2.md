@@ -153,7 +153,8 @@ of them, so the final box is `frame × age × scale attribute × pose`.
 
 ## What the runtime spike confirms, and what it cannot
 
-Source reading settles the shape of the answer, not the platform. `spike-s2/` is the boot:
+Source reading settles the shape of the answer, not the platform. The Spike S2 experiment was the
+boot:
 
 1. **Do the mixins apply at all in this toolchain?** Loom runs in no-remap mode on an unobfuscated
    26.x tree, and the workspace has no example of a mixin into a Minecraft class under Fabric: Armature

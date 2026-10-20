@@ -95,7 +95,13 @@ public abstract class EntityMixin {
      * with volume up and pitch down by scale. Reimplemented rather than argument-tweaked
      * because the call between here and there differs per loader; this shape is vanilla on
      * both. Carpet-muffled steps bypass this method and stay vanilla-pitched.
+     *
+     * <p>{@code BlockState.getSoundType()} is deprecated in 26.3, but vanilla's own
+     * {@code Entity.playStepSound} still calls it and there is no public replacement. NeoForge's
+     * {@code IBlockStateExtension} adds one, but it is not on :common's NeoForm classpath, so the
+     * call stays and the warning is suppressed with this reason rather than left to hide others.
      */
+    @SuppressWarnings("deprecation")
     @Inject(
             method = "playStepSound(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V",
             at = @At("HEAD"),

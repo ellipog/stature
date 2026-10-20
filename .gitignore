@@ -1,6 +1,10 @@
 # plan is a local working document, not committed
 plan.md
 
+# editor state and machine-local paths (testModsDir* for deployFabric/deployNeoForge)
+.vscode/
+local.properties
+
 # eclipse
 bin
 *.launch

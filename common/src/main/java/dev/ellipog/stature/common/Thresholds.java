@@ -164,6 +164,6 @@ public final class Thresholds {
         if (!level.getBlockState(eye).isCollisionShapeFullBlock(level, eye)) {
             return;
         }
-        entity.hurtOrSimulate(StatureDamageTypes.compression(level), 2.0F);
+        entity.hurtServer(level, StatureDamageTypes.compression(level), 2.0F);
     }
 }
