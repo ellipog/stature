@@ -24,6 +24,7 @@
         "client.CameraMixin",
         "client.EntityRenderDispatcherMixin",
         "client.EntityRendererCullingMixin",
+        "client.EntityRenderStateMixin",
         "client.GameRendererMixin",
         "client.ItemInHandLayerMixin",
         "client.LivingEntityRendererMixin",

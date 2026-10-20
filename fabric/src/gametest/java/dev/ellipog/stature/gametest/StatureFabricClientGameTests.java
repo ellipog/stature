@@ -4,13 +4,18 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureProjectile;
 
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.world.TestWorldSave;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.projectile.arrow.Arrow;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /**
  * Fabric client gametests (improvement plan M4): the render half that a
@@ -48,6 +53,60 @@ public final class StatureFabricClientGameTests implements FabricClientGameTest 
             });
             context.waitTicks(10);
             context.takeScreenshot("inventory_16x");
+
+            // Two arrows, because they prove different halves of the same contract. The first is
+            // the real gameplay path: a 16x player fires, the config clamps the inherited factor
+            // to 4, and the client entity must carry 4. The second has no owner at all and a
+            // hand-set factor of 3; the client cannot derive that from anything, so seeing 3
+            // proves the dedicated scale packet reached it. Both hitboxes must match too.
+            int[] arrowIds = {-1, -1};
+            float[] serverScales = {0.0F, 0.0F};
+            world.getServer().runOnServer(server -> {
+                ServerPlayer shooter = world.getConnection().getServerPlayer();
+                ServerLevel level = shooter.level();
+
+                Arrow fired = new Arrow(level, shooter, new ItemStack(Items.ARROW), null);
+                fired.shoot(0.0, 0.0, 1.0, 1.0F, 0.0F);
+                level.addFreshEntity(fired);
+                arrowIds[0] = fired.getId();
+                serverScales[0] = ((StatureProjectile) fired).stature$projectileScale();
+
+                Arrow ownerless = new Arrow(level,
+                        shooter.getX() + 1.0, shooter.getY() + 2.0, shooter.getZ(),
+                        new ItemStack(Items.ARROW), null);
+                ((StatureProjectile) ownerless).stature$setProjectileScale(3.0F);
+                ownerless.refreshDimensions();
+                level.addFreshEntity(ownerless);
+                arrowIds[1] = ownerless.getId();
+                serverScales[1] = ((StatureProjectile) ownerless).stature$projectileScale();
+            });
+            context.waitTicks(5);
+            world.getConnection().waitForClientboundPackets();
+
+            float clientFired = context.computeOnClient(client -> {
+                if (client.level == null) {
+                    return -1.0F;
+                }
+                var entity = client.level.getEntity(arrowIds[0]);
+                return entity instanceof StatureProjectile projectile
+                        ? projectile.stature$projectileScale() : -2.0F;
+            });
+            float clientOwnerless = context.computeOnClient(client -> {
+                if (client.level == null) {
+                    return -1.0F;
+                }
+                var entity = client.level.getEntity(arrowIds[1]);
+                return entity instanceof StatureProjectile projectile
+                        ? projectile.stature$projectileScale() : -2.0F;
+            });
+            if (serverScales[0] != 4.0F || clientFired != 4.0F) {
+                throw new AssertionError("a 16x player's arrow should clamp to 4x on both sides: server "
+                        + serverScales[0] + ", client " + clientFired);
+            }
+            if (serverScales[1] != 3.0F || clientOwnerless != 3.0F) {
+                throw new AssertionError("an ownerless 3x arrow should carry its synced factor on the "
+                        + "client: server " + serverScales[1] + ", client " + clientOwnerless);
+            }
 
             // A non-uniform box is saved on the entity, unlike the uniform scale above, which
             // rides the game's own scale attribute. That saved shape is what makes the join path

@@ -193,4 +193,24 @@ class RenderMixinContractTest {
                 PoseStack.class);
         assertEquals(void.class, method.getReturnType());
     }
+
+    @Test
+    void projectileScaleIsCopiedAtTheDispatcherExtract() throws Exception {
+        var method = net.minecraft.client.renderer.entity.EntityRenderDispatcher.class
+                .getDeclaredMethod("extractEntity",
+                        net.minecraft.world.entity.Entity.class, float.class);
+        assertEquals(net.minecraft.client.renderer.entity.state.EntityRenderState.class,
+                method.getReturnType());
+    }
+
+    @Test
+    void projectileScaleWrapsTheRendererSubmission() throws Exception {
+        var method = net.minecraft.client.renderer.entity.EntityRenderer.class.getDeclaredMethod(
+                "submit",
+                net.minecraft.client.renderer.entity.state.EntityRenderState.class,
+                PoseStack.class,
+                SubmitNodeCollector.class,
+                CameraRenderState.class);
+        assertEquals(void.class, method.getReturnType());
+    }
 }
