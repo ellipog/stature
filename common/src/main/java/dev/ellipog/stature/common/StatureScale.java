@@ -6,6 +6,7 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
 import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.client.RenderSampler;
 import dev.ellipog.stature.common.parts.HitRegion;
 import dev.ellipog.stature.common.frame.FrameSource;
@@ -50,6 +51,17 @@ public interface StatureScale {
 
     /** The size the entity is at now: the game's attribute for the scale, this duck for the shape. */
     ScaleState stature$currentState();
+
+    /**
+     * Why the current (or next) size change was started.
+     *
+     * <p>Stored on the entity because an ease commits one tick at a time, long after the call that
+     * asked for it returned; the cause travels with the transition so every tick reports the same
+     * reason to {@link StatureEvents}.
+     */
+    StatureEvents.Cause stature$scaleCause();
+
+    void stature$setScaleCause(StatureEvents.Cause cause);
 
     /** The box's shape. {@link ScaleAxes#UNIFORM} when nothing has shaped it. */
     ScaleAxes stature$axes();
@@ -102,6 +114,15 @@ public interface StatureScale {
      * their effects, and a hand edit here bypasses all of that.
      */
     Map<String, ChannelTransition> stature$channelTransitions();
+
+    /**
+     * Why each in-flight channel transition was started, by channel id.
+     *
+     * <p>Only ids with a running ease appear. The same lifecycle rule as the transitions: the
+     * service puts an entry when it starts an ease and removes it when the ease finishes or is
+     * replaced.
+     */
+    Map<String, StatureEvents.Cause> stature$channelCauses();
 
     /**
      * This entity's part factors by model path, live. Empty means a vanilla silhouette; use

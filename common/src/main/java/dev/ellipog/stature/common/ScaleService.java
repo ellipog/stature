@@ -4,6 +4,7 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleLimits;
 import dev.ellipog.stature.api.ScaleState;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
@@ -52,7 +53,21 @@ public final class ScaleService {
      * no-op from {@code RangedAttribute}, and not a value that is out of range everywhere else.
      */
     public static void setSize(LivingEntity entity, ScaleState target, int ticks, Easing easing) {
-        ((StatureScale) entity).stature$setTarget(clamped(target), ticks, easing);
+        setSize(entity, target, ticks, easing, StatureEvents.Cause.API);
+    }
+
+    /**
+     * Starts a size change and remembers why, so every tick of an ease reports the same cause.
+     *
+     * <p>Internal: the command, frame and facade paths pass their own reason; direct callers get
+     * {@link StatureEvents.Cause#API}.
+     */
+    public static void setSize(
+            LivingEntity entity, ScaleState target, int ticks, Easing easing,
+            StatureEvents.Cause cause) {
+        StatureScale duck = (StatureScale) entity;
+        duck.stature$setScaleCause(cause);
+        duck.stature$setTarget(clamped(target), ticks, easing);
     }
 
     /**
@@ -93,30 +108,54 @@ public final class ScaleService {
      * nobody asked for.
      */
     public static void apply(LivingEntity entity, ScaleState state, boolean finalTarget) {
-        float scale = state.scale();
+        apply(entity, state, finalTarget, StatureEvents.Cause.API);
+    }
 
-        // Only the uniform rides a base write. Reach, step and the rest of the attribute
-        // table belong to channels, whose modifiers compose onto the entity's own base:
-        // writing both counts twice (a scale-2 reach lands at 18 blocks instead of 9).
-        writeScale(entity, scale);
+    /**
+     * Commits a size and shape, then reports the change if either actually moved.
+     *
+     * <p>Internal: this is the one place a size lands, whether instantly, on an eased tick or from a
+     * client payload. The event fires after the attribute, the shape, the box and the broadcast are
+     * all settled, and the tier report is captured around the same commit so a listener sees the
+     * final state.
+     */
+    public static void apply(
+            LivingEntity entity, ScaleState state, boolean finalTarget,
+            StatureEvents.Cause cause) {
+        StatureEvents.batch(() -> {
+            ScaleState before = stateOf(entity);
+            StatureEvents.ThresholdTier tierBefore = StatureEvents.tierOf(entity);
+            float scale = state.scale();
 
-        ChannelService.applyAttributes(entity);
+            // Only the uniform rides a base write. Reach, step and the rest of the attribute
+            // table belong to channels, whose modifiers compose onto the entity's own base:
+            // writing both counts twice (a scale-2 reach lands at 18 blocks instead of 9).
+            writeScale(entity, scale);
 
-        StatureScale duck = (StatureScale) entity;
-        boolean shapeChanged = !duck.stature$axes().equals(state.axes());
-        AABB oldBox = entity.getBoundingBox();
-        duck.stature$setAxes(state.axes());
-        entity.refreshDimensions();
+            ChannelService.applyAttributes(entity);
 
-        if (finalTarget && !entity.level().isClientSide()) {
-            displace(entity, oldBox);
-        }
+            StatureScale duck = (StatureScale) entity;
+            boolean shapeChanged = !duck.stature$axes().equals(state.axes());
+            AABB oldBox = entity.getBoundingBox();
+            duck.stature$setAxes(state.axes());
+            entity.refreshDimensions();
 
-        if (shapeChanged && !entity.level().isClientSide()) {
-            // Only when the shape moved: a uniform ease changes the attribute twenty times and the
-            // shape not at all, and vanilla already syncs that attribute every tick.
-            StatureNetworking.broadcast(entity, state);
-        }
+            if (finalTarget && !entity.level().isClientSide()) {
+                displace(entity, oldBox);
+            }
+
+            if (shapeChanged && !entity.level().isClientSide()) {
+                // Only when the shape moved: a uniform ease changes the attribute twenty times and
+                // the shape not at all, and vanilla already syncs that attribute every tick.
+                StatureNetworking.broadcast(entity, state);
+            }
+
+            ScaleState after = stateOf(entity);
+            if (!before.equals(after)) {
+                StatureEvents.fireScaleChanged(entity, before, after, cause);
+            }
+            StatureEvents.fireTierChanged(entity, tierBefore, cause);
+        });
     }
 
     /**
@@ -236,12 +275,23 @@ public final class ScaleService {
      * guarantee the rest of the packet makes.
      */
     public static void applyFromServer(LivingEntity entity, ScaleState state, float eyeHeight) {
-        ((StatureScale) entity).stature$setAxes(state.axes());
-        ((StatureScale) entity).stature$setEyeHeight(
-                eyeHeight != StatureScale.NO_EYE_HEIGHT && eyeHeight > 0.0F
-                        ? eyeHeight
-                        : StatureScale.NO_EYE_HEIGHT);
-        entity.refreshDimensions();
+        StatureEvents.batch(() -> {
+            ScaleState before = stateOf(entity);
+            StatureEvents.ThresholdTier tierBefore = StatureEvents.tierOf(entity);
+            ((StatureScale) entity).stature$setAxes(state.axes());
+            ((StatureScale) entity).stature$setEyeHeight(
+                    eyeHeight != StatureScale.NO_EYE_HEIGHT && eyeHeight > 0.0F
+                            ? eyeHeight
+                            : StatureScale.NO_EYE_HEIGHT);
+            entity.refreshDimensions();
+
+            ScaleState after = stateOf(entity);
+            if (!before.equals(after)) {
+                StatureEvents.fireScaleChanged(
+                        entity, before, after, StatureEvents.Cause.CLIENT);
+            }
+            StatureEvents.fireTierChanged(entity, tierBefore, StatureEvents.Cause.CLIENT);
+        });
     }
 
     /** Pulls both halves into the envelope: the scale, and each axis of the box. */

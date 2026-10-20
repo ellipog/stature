@@ -4,6 +4,7 @@ import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
@@ -61,7 +62,7 @@ public abstract class ServerPlayerMixin {
         ChannelService.applyAttributes(self);
         // Instant and linear: this is a restoration, not a change, so there is nothing to ease.
         // The apply broadcasts, which unknown-id receivers drop and tracking then repeats.
-        ScaleService.setSize(self, oldState, 0, Easing.LINEAR);
+        ScaleService.setSize(self, oldState, 0, Easing.LINEAR, StatureEvents.Cause.LOAD);
         duck.stature$setNeedsSync(true);
     }
 }

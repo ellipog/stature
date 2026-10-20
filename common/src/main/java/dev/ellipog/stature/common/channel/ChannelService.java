@@ -1,7 +1,13 @@
 package dev.ellipog.stature.common.channel;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 
 import dev.ellipog.stature.api.ChannelSpec;
 import dev.ellipog.stature.api.ChannelTransition;
@@ -10,6 +16,7 @@ import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.core.Holder;
@@ -98,31 +105,51 @@ public final class ChannelService {
      * @throws IllegalStateException    when called anywhere but the server
      */
     public static void setChannel(LivingEntity entity, String id, float value, int ticks, Easing easing) {
-        requireServer(entity);
-        ChannelSpec spec = require(id);
-        if (!Float.isFinite(value)) {
-            throw new IllegalArgumentException("channel " + id + " needs a finite value, got " + value);
-        }
+        setChannel(entity, id, value, ticks, easing, StatureEvents.Cause.COMMAND);
+    }
 
-        StatureScale duck = (StatureScale) entity;
-        if (MODEL.equals(id)) {
-            // A hand-set model is no longer the dangerous set's leftover, so a later plain
-            // /stature set must preserve it. The dangerous command sets the flag back to true
-            // after this call.
-            duck.stature$setDangerousModel(false);
-        }
-        float from = resolvedValue(entity, spec);
-        duck.stature$channelOverrides().put(id, value);
-        if (ticks <= 0) {
-            duck.stature$channelTransitions().remove(id);
-            applyAttributes(entity);
-        } else {
-            duck.stature$channelTransitions().put(id, ChannelTransition.between(from, value, ticks, easing));
-        }
-        // An empty map never reaches here (the override was just put), and a reset below sends
-        // even an empty one: the receiver replaces its whole map, so an empty send is how a
-        // removal travels rather than a packet dropped for having nothing in it.
-        StatureNetworking.broadcast(entity, syncMap(entity));
+    /**
+     * Sets a channel override and reports the committed value with its cause.
+     *
+     * <p>Internal: the command and facade pass their own cause, so a listener can tell an operator
+     * action from another mod's call.
+     */
+    public static void setChannel(
+            LivingEntity entity, String id, float value, int ticks, Easing easing,
+            StatureEvents.Cause cause) {
+        StatureEvents.batch(() -> {
+            requireServer(entity);
+            ChannelSpec spec = require(id);
+            if (!Float.isFinite(value)) {
+                throw new IllegalArgumentException(
+                        "channel " + id + " needs a finite value, got " + value);
+            }
+
+            StatureScale duck = (StatureScale) entity;
+            if (MODEL.equals(id)) {
+                // A hand-set model is no longer the dangerous set's leftover, so a later plain
+                // /stature set must preserve it. The dangerous command sets the flag back to true
+                // after this call.
+                duck.stature$setDangerousModel(false);
+            }
+            Float before = duck.stature$channelOverrides().get(id);
+            float from = resolvedValue(entity, spec);
+            duck.stature$channelOverrides().put(id, value);
+            if (ticks <= 0) {
+                duck.stature$channelTransitions().remove(id);
+                duck.stature$channelCauses().remove(id);
+                applyAttributes(entity);
+            } else {
+                duck.stature$channelTransitions().put(
+                        id, ChannelTransition.between(from, value, ticks, easing));
+                duck.stature$channelCauses().put(id, cause);
+            }
+            // An empty map never reaches here (the override was just put), and a reset below sends
+            // even an empty one: the receiver replaces its whole map, so an empty send is how a
+            // removal travels rather than a packet dropped for having nothing in it.
+            StatureNetworking.broadcast(entity, syncMap(entity));
+            StatureEvents.fireChannelChanged(entity, id, before, value, cause);
+        });
     }
 
     /**
@@ -132,17 +159,28 @@ public final class ChannelService {
      * @throws IllegalStateException    when called anywhere but the server
      */
     public static void resetChannel(LivingEntity entity, String id) {
-        requireServer(entity);
-        require(id);
+        resetChannel(entity, id, StatureEvents.Cause.COMMAND);
+    }
 
-        StatureScale duck = (StatureScale) entity;
-        if (MODEL.equals(id)) {
-            duck.stature$setDangerousModel(false);
-        }
-        duck.stature$channelOverrides().remove(id);
-        duck.stature$channelTransitions().remove(id);
-        applyAttributes(entity);
-        StatureNetworking.broadcast(entity, syncMap(entity));
+    /** Drops one override and reports the removal, if there was one. */
+    public static void resetChannel(LivingEntity entity, String id, StatureEvents.Cause cause) {
+        StatureEvents.batch(() -> {
+            requireServer(entity);
+            require(id);
+
+            StatureScale duck = (StatureScale) entity;
+            if (MODEL.equals(id)) {
+                duck.stature$setDangerousModel(false);
+            }
+            Float before = duck.stature$channelOverrides().remove(id);
+            duck.stature$channelTransitions().remove(id);
+            duck.stature$channelCauses().remove(id);
+            applyAttributes(entity);
+            StatureNetworking.broadcast(entity, syncMap(entity));
+            if (before != null) {
+                StatureEvents.fireChannelChanged(entity, id, before, null, cause);
+            }
+        });
     }
 
     /**
@@ -153,17 +191,31 @@ public final class ChannelService {
      * same contract {@link #resetChannel} follows.
      */
     public static void clearAll(LivingEntity entity) {
-        requireServer(entity);
-        StatureScale duck = (StatureScale) entity;
-        boolean hadAny = !duck.stature$channelOverrides().isEmpty()
-                || !duck.stature$channelTransitions().isEmpty();
-        duck.stature$channelOverrides().clear();
-        duck.stature$channelTransitions().clear();
-        duck.stature$setDangerousModel(false);
-        applyAttributes(entity);
-        if (hadAny) {
-            StatureNetworking.broadcast(entity, Map.of());
-        }
+        clearAll(entity, StatureEvents.Cause.COMMAND);
+    }
+
+    /**
+     * Drops every override and every in-flight channel change, reporting each removal.
+     *
+     * <p>The receiver replaces its whole map rather than merging, so an empty send is how "none
+     * left" travels, the same contract {@link #resetChannel} follows.
+     */
+    public static void clearAll(LivingEntity entity, StatureEvents.Cause cause) {
+        StatureEvents.batch(() -> {
+            requireServer(entity);
+            StatureScale duck = (StatureScale) entity;
+            Map<String, Float> before = Map.copyOf(duck.stature$channelOverrides());
+            boolean hadAny = !before.isEmpty() || !duck.stature$channelTransitions().isEmpty();
+            duck.stature$channelOverrides().clear();
+            duck.stature$channelTransitions().clear();
+            duck.stature$channelCauses().clear();
+            duck.stature$setDangerousModel(false);
+            applyAttributes(entity);
+            if (hadAny) {
+                StatureNetworking.broadcast(entity, Map.of());
+            }
+            fireChanges(entity, before, Map.of(), cause);
+        });
     }
 
     /**
@@ -261,24 +313,40 @@ public final class ChannelService {
             return;
         }
 
-        boolean changed = false;
-        for (Map.Entry<String, ChannelTransition> entry
-                : new LinkedHashMap<>(transitions).entrySet()) {
-            float value = entry.getValue().advance();
-            duck.stature$channelOverrides().put(entry.getKey(), value);
-            changed = true;
-            if (entry.getValue().isDone()) {
-                transitions.remove(entry.getKey());
+        StatureEvents.batch(() -> {
+            List<Change> changes = new ArrayList<>();
+            for (Map.Entry<String, ChannelTransition> entry
+                    : new LinkedHashMap<>(transitions).entrySet()) {
+                String id = entry.getKey();
+                Float before = duck.stature$channelOverrides().get(id);
+                float value = entry.getValue().advance();
+                duck.stature$channelOverrides().put(id, value);
+                StatureEvents.Cause cause =
+                        duck.stature$channelCauses().getOrDefault(id, StatureEvents.Cause.API);
+                changes.add(new Change(id, before, value, cause));
+                if (entry.getValue().isDone()) {
+                    transitions.remove(id);
+                    duck.stature$channelCauses().remove(id);
+                }
             }
-        }
 
-        if (changed) {
-            applyAttributes(entity);
-            // The client holds a copy of the overrides for what it draws, so an eased value is
-            // re-sent every tick it moves -- the same cadence as a shape mid-ease, for the same
-            // reason: the far end converges instead of snapping.
-            StatureNetworking.broadcast(entity, syncMap(entity));
-        }
+            if (!changes.isEmpty()) {
+                applyAttributes(entity);
+                // The client holds a copy of the overrides for what it draws, so an eased value is
+                // re-sent every tick it moves -- the same cadence as a shape mid-ease, for the same
+                // reason: the far end converges instead of snapping.
+                StatureNetworking.broadcast(entity, syncMap(entity));
+                changes.sort(Comparator.comparing(Change::id));
+                for (Change change : changes) {
+                    StatureEvents.fireChannelChanged(
+                            entity, change.id(), change.from(), change.to(), change.cause());
+                }
+            }
+        });
+    }
+
+    /** One channel commit inside a tick, kept until every effect has been applied. */
+    private record Change(String id, Float from, float to, StatureEvents.Cause cause) {
     }
 
     /**
@@ -359,12 +427,44 @@ public final class ChannelService {
     public static boolean load(LivingEntity entity, ValueInput input) {
         StatureScale duck = (StatureScale) entity;
         Map<String, Float> overrides = duck.stature$channelOverrides();
-        boolean seen = ChannelSaveCodec.restore(input, overrides);
+        Map<String, Float> before = Map.copyOf(overrides);
+        boolean[] seen = new boolean[1];
+        StatureEvents.batch(() -> {
+            seen[0] = ChannelSaveCodec.restore(input, overrides);
+            if (seen[0] && !entity.level().isClientSide() && !overrides.isEmpty()) {
+                applyAttributes(entity);
+            }
+            fireChanges(entity, before, overrides, StatureEvents.Cause.LOAD);
+        });
+        return seen[0];
+    }
 
-        if (seen && !entity.level().isClientSide() && !overrides.isEmpty()) {
-            applyAttributes(entity);
+    /**
+     * Replaces the client's override map from a server packet and reports every difference.
+     *
+     * <p>Client-side and called on the client's main thread by both loaders. Replacement rather than
+     * merge is the payload's contract: a key missing from the packet was removed on the server.
+     */
+    public static void applyFromServer(LivingEntity entity, Map<String, Float> channels) {
+        StatureEvents.batch(() -> {
+            StatureScale duck = (StatureScale) entity;
+            Map<String, Float> before = Map.copyOf(duck.stature$channelOverrides());
+            duck.stature$channelOverrides().clear();
+            duck.stature$channelOverrides().putAll(Objects.requireNonNull(channels, "channels"));
+            duck.stature$channelCauses().clear();
+            fireChanges(entity, before, duck.stature$channelOverrides(), StatureEvents.Cause.CLIENT);
+        });
+    }
+
+    /** Reports each id whose override differs between two maps, in id order. */
+    private static void fireChanges(
+            LivingEntity entity, Map<String, Float> before, Map<String, Float> after,
+            StatureEvents.Cause cause) {
+        Set<String> ids = new TreeSet<>(before.keySet());
+        ids.addAll(after.keySet());
+        for (String id : ids) {
+            StatureEvents.fireChannelChanged(entity, id, before.get(id), after.get(id), cause);
         }
-        return seen;
     }
 
     /** Saves overrides only: easing progress is transient, targets travel. */

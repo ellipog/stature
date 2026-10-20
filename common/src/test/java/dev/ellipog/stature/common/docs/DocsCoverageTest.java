@@ -4,14 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.ellipog.stature.common.api.StatureApi;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelRegistry;
 
 import org.junit.jupiter.api.Test;
@@ -63,6 +69,30 @@ class DocsCoverageTest {
         for (String id : ChannelRegistry.instance().ids()) {
             assertTrue(mentions(channels, id),
                     "docs/channels.md does not mention the " + id + " channel");
+        }
+    }
+
+    @Test
+    void everyPublicApiMethodIsDocumented() throws IOException {
+        String api = readRepoFile("docs/api/index.md");
+        for (Method method : StatureApi.class.getDeclaredMethods()) {
+            if (Modifier.isPublic(method.getModifiers()) && !method.isSynthetic()) {
+                assertTrue(mentions(api, method.getName()),
+                        "docs/api/index.md does not mention StatureApi." + method.getName());
+            }
+        }
+    }
+
+    @Test
+    void everyEventListenerListIsDocumented() throws IOException {
+        String events = readRepoFile("docs/api/events.md");
+        for (Field field : StatureEvents.class.getDeclaredFields()) {
+            if (Modifier.isPublic(field.getModifiers())
+                    && Modifier.isStatic(field.getModifiers())
+                    && List.class.isAssignableFrom(field.getType())) {
+                assertTrue(mentions(events, field.getName()),
+                        "docs/api/events.md does not mention StatureEvents." + field.getName());
+            }
         }
     }
 

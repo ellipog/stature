@@ -12,6 +12,7 @@ import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.Thresholds;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.client.RenderSampler;
 import dev.ellipog.stature.common.parts.PartService;
@@ -66,6 +67,9 @@ public abstract class LivingEntityMixin implements StatureScale {
     private ScaleAxes stature$axes;
 
     @Unique
+    private StatureEvents.Cause stature$scaleCause = StatureEvents.Cause.API;
+
+    @Unique
     private Identifier stature$frame;
 
     @Unique
@@ -79,6 +83,9 @@ public abstract class LivingEntityMixin implements StatureScale {
 
     @Unique
     private Map<String, ChannelTransition> stature$channelTransitions;
+
+    @Unique
+    private Map<String, StatureEvents.Cause> stature$channelCauses;
 
     @Unique
     private Map<String, ScaleAxes> stature$partFactors;
@@ -122,6 +129,16 @@ public abstract class LivingEntityMixin implements StatureScale {
     @Override
     public ScaleState stature$currentState() {
         return ScaleService.stateOf((LivingEntity) (Object) this);
+    }
+
+    @Override
+    public StatureEvents.Cause stature$scaleCause() {
+        return this.stature$scaleCause == null ? StatureEvents.Cause.API : this.stature$scaleCause;
+    }
+
+    @Override
+    public void stature$setScaleCause(StatureEvents.Cause cause) {
+        this.stature$scaleCause = cause == null ? StatureEvents.Cause.API : cause;
     }
 
     @Override
@@ -178,6 +195,14 @@ public abstract class LivingEntityMixin implements StatureScale {
             this.stature$channelTransitions = new LinkedHashMap<>();
         }
         return this.stature$channelTransitions;
+    }
+
+    @Override
+    public Map<String, StatureEvents.Cause> stature$channelCauses() {
+        if (this.stature$channelCauses == null) {
+            this.stature$channelCauses = new LinkedHashMap<>();
+        }
+        return this.stature$channelCauses;
     }
 
     @Override
@@ -285,7 +310,8 @@ public abstract class LivingEntityMixin implements StatureScale {
             // A change with no ticks is not a special case with its own code path: it is a
             // transition that is already over, and it lands here so that the instant and the eased
             // command differ only in the numbers they pass.
-            ScaleService.apply(self, ScaleService.clamped(target));
+            ScaleService.apply(
+                    self, ScaleService.clamped(target), true, this.stature$scaleCause());
         }
     }
 
@@ -311,7 +337,9 @@ public abstract class LivingEntityMixin implements StatureScale {
         // Displacement is paid only once the target box is reached: during an ease the box
         // passes through shapes nobody asked for, and searching for a way out on every one of
         // them is both the bulk of the cost and a jitter the player would see.
-        ScaleService.apply(self, this.stature$transition.advance(), this.stature$transition.isDone());
+        ScaleService.apply(
+                self, this.stature$transition.advance(), this.stature$transition.isDone(),
+                this.stature$scaleCause());
     }
 
     /**

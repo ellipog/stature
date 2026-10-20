@@ -14,6 +14,7 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.StatureNetworking;
 import dev.ellipog.stature.common.parts.PartService;
@@ -64,7 +65,7 @@ public final class FrameService {
      *         reporting success
      */
     public static boolean apply(LivingEntity entity, Identifier frameId, int ticks) {
-        return applyAs(entity, frameId, ticks, FrameSource.COMMAND);
+        return applyAs(entity, frameId, ticks, FrameSource.COMMAND, StatureEvents.Cause.COMMAND);
     }
 
     /**
@@ -84,7 +85,8 @@ public final class FrameService {
         if (isExplicitlyOwned(((StatureScale) entity).stature$frameSource())) {
             return false;
         }
-        return applyAs(entity, frameId, ticks, FrameSource.INTEGRATION);
+        return applyAs(entity, frameId, ticks, FrameSource.INTEGRATION,
+                StatureEvents.Cause.INTEGRATION);
     }
 
     /**
@@ -103,15 +105,21 @@ public final class FrameService {
         if (duck.stature$frameSource() != FrameSource.INTEGRATION) {
             return false;
         }
-        duck.stature$setFrame(null);
-        duck.stature$setFrameSource(FrameSource.NONE);
-        duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
-        duck.stature$setFirstPersonVanilla(false);
-        duck.stature$partFactors().clear();
-        duck.stature$partTransitions().clear();
-        ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
-        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
-        StatureConfig.pushThresholds(entity);
+        StatureEvents.batch(() -> {
+            Identifier beforeFrame = duck.stature$frame();
+            duck.stature$setFrame(null);
+            duck.stature$setFrameSource(FrameSource.NONE);
+            duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+            duck.stature$setFirstPersonVanilla(false);
+            duck.stature$partFactors().clear();
+            duck.stature$partTransitions().clear();
+            ScaleService.setSize(
+                    entity, ScaleState.UNIFORM, 0, Easing.LINEAR, StatureEvents.Cause.INTEGRATION);
+            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StatureConfig.pushThresholds(entity, StatureEvents.Cause.INTEGRATION);
+            StatureEvents.fireFrameChanged(
+                    entity, beforeFrame, null, StatureEvents.Cause.INTEGRATION);
+        });
         return true;
     }
 
@@ -148,8 +156,16 @@ public final class FrameService {
      * number.
      */
     public static void setManualScale(LivingEntity entity, float scale, int ticks, Easing easing) {
+        setManualScale(entity, scale, ticks, easing, StatureEvents.Cause.COMMAND);
+    }
+
+    /** The facade's version of a manual scale: the same service, with its own cause. */
+    public static void setManualScale(
+            LivingEntity entity, float scale, int ticks, Easing easing,
+            StatureEvents.Cause cause) {
         ((StatureScale) entity).stature$setFrameSource(FrameSource.MANUAL);
-        ScaleService.setSize(entity, ScaleService.stateOf(entity).withScale(scale), ticks, easing);
+        ScaleService.setSize(
+                entity, ScaleService.stateOf(entity).withScale(scale), ticks, easing, cause);
     }
 
     /**
@@ -159,32 +175,51 @@ public final class FrameService {
      * frame whose numbers are no longer on the entity would be worse than reporting no frame.
      */
     public static void setManualShape(LivingEntity entity, ScaleAxes axes, int ticks, Easing easing) {
+        setManualShape(entity, axes, ticks, easing, StatureEvents.Cause.COMMAND);
+    }
+
+    /** The facade's version of a manual shape: the same service, with its own cause. */
+    public static void setManualShape(
+            LivingEntity entity, ScaleAxes axes, int ticks, Easing easing,
+            StatureEvents.Cause cause) {
         StatureScale duck = (StatureScale) entity;
-        duck.stature$setFrame(null);
-        duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
-        duck.stature$setFirstPersonVanilla(false);
-        duck.stature$setFrameSource(FrameSource.MANUAL);
-        ScaleService.setSize(entity, ScaleService.stateOf(entity).withAxes(axes), ticks, easing);
-        StatureConfig.pushThresholds(entity);
+        StatureEvents.batch(() -> {
+            Identifier beforeFrame = duck.stature$frame();
+            duck.stature$setFrame(null);
+            duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+            duck.stature$setFirstPersonVanilla(false);
+            duck.stature$setFrameSource(FrameSource.MANUAL);
+            ScaleService.setSize(
+                    entity, ScaleService.stateOf(entity).withAxes(axes), ticks, easing, cause);
+            StatureConfig.pushThresholds(entity, cause);
+            StatureEvents.fireFrameChanged(entity, beforeFrame, null, cause);
+        });
     }
 
     /** Forgets the frame and returns the entity to vanilla proportions. */
     public static void clear(LivingEntity entity) {
         StatureScale duck = (StatureScale) entity;
-        if (duck.stature$dangerousModel()) {
-            // The dangerous model is a visual leftover, not a frame: clearing a frame should not
-            // leave the entity drawn at 100x while its box is vanilla again.
-            ChannelService.resetChannel(entity, ChannelService.MODEL);
-        }
-        duck.stature$setFrame(null);
-        duck.stature$setFrameSource(FrameSource.MANUAL);
-        duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
-        duck.stature$setFirstPersonVanilla(false);
-        duck.stature$partFactors().clear();
-        duck.stature$partTransitions().clear();
-        ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
-        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
-        StatureConfig.pushThresholds(entity);
+        StatureEvents.batch(() -> {
+            Identifier beforeFrame = duck.stature$frame();
+            if (duck.stature$dangerousModel()) {
+                // The dangerous model is a visual leftover, not a frame: clearing a frame should not
+                // leave the entity drawn at 100x while its box is vanilla again.
+                ChannelService.resetChannel(
+                        entity, ChannelService.MODEL, StatureEvents.Cause.COMMAND);
+            }
+            duck.stature$setFrame(null);
+            duck.stature$setFrameSource(FrameSource.MANUAL);
+            duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+            duck.stature$setFirstPersonVanilla(false);
+            duck.stature$partFactors().clear();
+            duck.stature$partTransitions().clear();
+            ScaleService.setSize(
+                    entity, ScaleState.UNIFORM, 0, Easing.LINEAR, StatureEvents.Cause.COMMAND);
+            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StatureConfig.pushThresholds(entity, StatureEvents.Cause.COMMAND);
+            StatureEvents.fireFrameChanged(
+                    entity, beforeFrame, null, StatureEvents.Cause.COMMAND);
+        });
     }
 
     /** Applies a pack declaration the first time an undecided server-side entity ticks. */
@@ -217,7 +252,9 @@ public final class FrameService {
             return false;
         }
 
-        return applyAs(entity, selection.get().frame(), 0, selection.get().source());
+        return applyAs(
+                entity, selection.get().frame(), 0, selection.get().source(),
+                StatureEvents.Cause.FRAME);
     }
 
     /**
@@ -286,7 +323,9 @@ public final class FrameService {
         return ((StatureScale) entity).stature$frameSource();
     }
 
-    private static boolean applyAs(LivingEntity entity, Identifier frameId, int ticks, FrameSource source) {
+    private static boolean applyAs(
+            LivingEntity entity, Identifier frameId, int ticks, FrameSource source,
+            StatureEvents.Cause cause) {
         FrameFile file = StatureFrames.file(frameId);
         if (file == null) {
             return false;
@@ -300,25 +339,32 @@ public final class FrameService {
                 : frame.axesFor(base.width(), base.height());
 
         StatureScale duck = (StatureScale) entity;
-        duck.stature$setFrame(frameId);
-        duck.stature$setFrameSource(source);
-        duck.stature$setEyeHeight(frame.hasEyeHeight() ? frame.eyeHeight() : StatureScale.NO_EYE_HEIGHT);
-        duck.stature$setFirstPersonVanilla(file.firstPersonArms() != null && file.firstPersonArms());
-        duck.stature$partFactors().clear();
-        duck.stature$partFactors().putAll(parts);
-        duck.stature$partTransitions().clear();
-        if (ticks > 0) {
-            for (Map.Entry<String, ScaleAxes> entry : parts.entrySet()) {
-                duck.stature$partTransitions().put(entry.getKey(), AxesTransition.between(
-                        ScaleAxes.UNIFORM, entry.getValue(), ticks, frame.easing()));
+        StatureEvents.batch(() -> {
+            Identifier beforeFrame = duck.stature$frame();
+            duck.stature$setFrame(frameId);
+            duck.stature$setFrameSource(source);
+            duck.stature$setEyeHeight(
+                    frame.hasEyeHeight() ? frame.eyeHeight() : StatureScale.NO_EYE_HEIGHT);
+            duck.stature$setFirstPersonVanilla(
+                    file.firstPersonArms() != null && file.firstPersonArms());
+            duck.stature$partFactors().clear();
+            duck.stature$partFactors().putAll(parts);
+            duck.stature$partTransitions().clear();
+            if (ticks > 0) {
+                for (Map.Entry<String, ScaleAxes> entry : parts.entrySet()) {
+                    duck.stature$partTransitions().put(entry.getKey(), AxesTransition.between(
+                            ScaleAxes.UNIFORM, entry.getValue(), ticks, frame.easing()));
+                }
             }
-        }
 
-        // The frame's own scale, not the entity's current one: applying a frame is choosing a size,
-        // and a caller who wants a different scale can follow it with /stature set.
-        ScaleService.setSize(entity, new ScaleState(frame.scale(), axes), ticks, frame.easing());
-        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
-        StatureConfig.pushThresholds(entity);
+            // The frame's own scale, not the entity's current one: applying a frame is choosing a
+            // size, and a caller who wants a different scale can follow it with /stature set.
+            ScaleService.setSize(
+                    entity, new ScaleState(frame.scale(), axes), ticks, frame.easing(), cause);
+            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StatureConfig.pushThresholds(entity, cause);
+            StatureEvents.fireFrameChanged(entity, beforeFrame, frameId, cause);
+        });
         return true;
     }
 
@@ -387,20 +433,25 @@ public final class FrameService {
         if (winner.frame().equals(duck.stature$frame()) && winner.source() == source) {
             return false;
         }
-        return applyAs(entity, winner.frame(), 0, winner.source());
+        return applyAs(entity, winner.frame(), 0, winner.source(), StatureEvents.Cause.FRAME);
     }
 
     private static void resetAutomatic(LivingEntity entity) {
         StatureScale duck = (StatureScale) entity;
-        duck.stature$setFrame(null);
-        duck.stature$setFrameSource(FrameSource.DEFAULT);
-        duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
-        duck.stature$setFirstPersonVanilla(false);
-        duck.stature$partFactors().clear();
-        duck.stature$partTransitions().clear();
-        ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
-        StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
-        StatureConfig.pushThresholds(entity);
+        StatureEvents.batch(() -> {
+            Identifier beforeFrame = duck.stature$frame();
+            duck.stature$setFrame(null);
+            duck.stature$setFrameSource(FrameSource.DEFAULT);
+            duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+            duck.stature$setFirstPersonVanilla(false);
+            duck.stature$partFactors().clear();
+            duck.stature$partTransitions().clear();
+            ScaleService.setSize(
+                    entity, ScaleState.UNIFORM, 0, Easing.LINEAR, StatureEvents.Cause.FRAME);
+            StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+            StatureConfig.pushThresholds(entity, StatureEvents.Cause.FRAME);
+            StatureEvents.fireFrameChanged(entity, beforeFrame, null, StatureEvents.Cause.FRAME);
+        });
     }
 
 }

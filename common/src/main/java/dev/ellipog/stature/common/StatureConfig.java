@@ -14,6 +14,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
@@ -265,16 +266,29 @@ public final class StatureConfig {
      * the configured values once, so clients drop the stale answer. Server-side only.
      */
     public static void pushThresholds(LivingEntity entity) {
+        pushThresholds(entity, StatureEvents.Cause.API);
+    }
+
+    /**
+     * Stores this entity's resolved thresholds and reports a tier change after the store.
+     *
+     * <p>Internal: the frame, command and load paths pass the cause that made the thresholds move.
+     */
+    public static void pushThresholds(LivingEntity entity, StatureEvents.Cause cause) {
         if (entity.level().isClientSide()) {
             return;
         }
-        StatureScale duck = (StatureScale) entity;
-        ResolvedThresholds resolved = resolveThresholds(entity);
-        if (java.util.Objects.equals(duck.stature$thresholds(), resolved)) {
-            return;
-        }
-        duck.stature$setThresholds(resolved);
-        StatureNetworking.broadcastThresholds(entity, wireValues(entity, resolved));
+        StatureEvents.batch(() -> {
+            StatureScale duck = (StatureScale) entity;
+            ResolvedThresholds resolved = resolveThresholds(entity);
+            if (java.util.Objects.equals(duck.stature$thresholds(), resolved)) {
+                return;
+            }
+            StatureEvents.ThresholdTier before = StatureEvents.tierOf(entity);
+            duck.stature$setThresholds(resolved);
+            StatureNetworking.broadcastThresholds(entity, wireValues(entity, resolved));
+            StatureEvents.fireTierChanged(entity, before, cause);
+        });
     }
 
     /**
@@ -293,8 +307,26 @@ public final class StatureConfig {
         if (resolved == null) {
             return;
         }
-        ((StatureScale) entity).stature$setThresholds(resolved);
-        StatureNetworking.sendThresholdsTo(player, entity, resolved);
+        StatureEvents.batch(() -> {
+            StatureEvents.ThresholdTier before = StatureEvents.tierOf(entity);
+            ((StatureScale) entity).stature$setThresholds(resolved);
+            StatureNetworking.sendThresholdsTo(player, entity, resolved);
+            StatureEvents.fireTierChanged(entity, before, StatureEvents.Cause.SYNC);
+        });
+    }
+
+    /**
+     * Stores thresholds received by a client and reports a tier change, if the new edges or flags
+     * moved the entity across one.
+     *
+     * <p>Client-side; the payload handlers call it on the client's main thread.
+     */
+    public static void applyFromServer(LivingEntity entity, ResolvedThresholds resolved) {
+        StatureEvents.batch(() -> {
+            StatureEvents.ThresholdTier before = StatureEvents.tierOf(entity);
+            ((StatureScale) entity).stature$setThresholds(resolved);
+            StatureEvents.fireTierChanged(entity, before, StatureEvents.Cause.CLIENT);
+        });
     }
 
     /**
@@ -308,7 +340,7 @@ public final class StatureConfig {
         for (ServerLevel level : server.getAllLevels()) {
             for (Entity entity : level.getAllEntities()) {
                 if (entity instanceof LivingEntity living) {
-                    pushThresholds(living);
+                    pushThresholds(living, StatureEvents.Cause.COMMAND);
                 }
             }
         }

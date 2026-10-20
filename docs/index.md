@@ -48,3 +48,5 @@ Do not install Stature beside Pehkui or Pehkui Rebuilt. All of them write the ga
 | [[stature:thresholds]] | The server config file and the micro and macro mechanics |
 | [[stature:dangerous]] | Sizes past the game's scale envelope, and how the box and the model separate |
 | [[stature:compatibility]] | Pehkui, other scale modifiers, claims, shaders and the client and server rules |
+| [[stature:api]] | The supported facade for another mod: sizes, shapes, channels and integration frames |
+| [[stature:api/events]] | The change events, their causes and the ordering and thread guarantees |

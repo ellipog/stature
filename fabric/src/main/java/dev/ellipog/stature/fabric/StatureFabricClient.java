@@ -4,6 +4,7 @@ import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
 import dev.ellipog.stature.common.client.CameraTrauma;
@@ -50,10 +51,9 @@ public final class StatureFabricClient implements ClientModInitializer {
                     Entity entity = context.client().level.getEntity(payload.entityId());
                     if (entity instanceof LivingEntity living) {
                         // Full replace, never merge: a key missing here was removed there, and a
-                        // merge would keep the dead key forever.
-                        StatureScale duck = (StatureScale) living;
-                        duck.stature$channelOverrides().clear();
-                        duck.stature$channelOverrides().putAll(payload.channels());
+                        // merge would keep the dead key forever. The service also reports the
+                        // differences to StatureEvents on this thread.
+                        ChannelService.applyFromServer(living, payload.channels());
                     }
                 }));
         ClientPlayNetworking.registerGlobalReceiver(PartsPayload.TYPE, (payload, context) ->
@@ -78,8 +78,10 @@ public final class StatureFabricClient implements ClientModInitializer {
                     if (entity instanceof LivingEntity living) {
                         // Full replace, like the channels: the server resolved this entity's
                         // frame over the configured values, and a removal there reads as a
-                        // re-resolve here rather than a merge that keeps the dead key.
-                        ((StatureScale) living).stature$setThresholds(
+                        // re-resolve here rather than a merge that keeps the dead key. The
+                        // service reports a tier crossing after storing the new edges.
+                        StatureConfig.applyFromServer(
+                                living,
                                 new ResolvedThresholds(payload.micro(), payload.macro(), payload.flags()));
                     }
                 }));

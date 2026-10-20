@@ -33,6 +33,10 @@ Stature has not been released yet. This section covers everything on `master` so
 - Fabric and NeoForge builds from one shared implementation, with a Fabric handshake and
   NeoForge required payloads so a client without Stature is refused rather than shown wrong-size
   entities.
+- A supported API facade in `dev.ellipog.stature.common.api`: `StatureApi` reads and changes sizes,
+  shapes, channel overrides and integration frames, and `StatureEvents` reports scale, frame,
+  channel and threshold-tier changes with a cause. The `stature-api` artifact stays pure Java value
+  types; everything outside the facade package is internal.
 
 ### Changed
 

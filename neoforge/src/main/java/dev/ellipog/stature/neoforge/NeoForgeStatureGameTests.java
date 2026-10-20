@@ -58,7 +58,9 @@ public final class NeoForgeStatureGameTests {
                     StatureGameTests::dangerousModelResetOnPlainSet),
             new TestCase("reset_clears_everything", StatureGameTests::resetClearsEverything),
             new TestCase("foreign_scale_modifier_no_drift",
-                    StatureGameTests::foreignScaleModifierNoDrift));
+                    StatureGameTests::foreignScaleModifierNoDrift),
+            new TestCase("api_grows_zombie_and_fires_scale_changed",
+                    StatureGameTests::apiGrowsZombieAndFiresScaleChanged));
 
     private static final DeferredRegister<Consumer<GameTestHelper>> FUNCTIONS =
             DeferredRegister.create(Registries.TEST_FUNCTION, Stature.MOD_ID);

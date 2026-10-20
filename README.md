@@ -57,5 +57,7 @@ The manual lives in [docs/](docs/index.md), written for ellipog.dev.
 | [Thresholds](docs/thresholds.md) | The config file and the micro and macro mechanics |
 | [Dangerous sizes](docs/dangerous.md) | Sizes past the game's scale envelope |
 | [Compatibility](docs/compatibility.md) | Pehkui, claims, shaders and the client and server rules |
+| [API](docs/api/index.md) | The supported facade for another mod |
+| [API events](docs/api/events.md) | Change events and their thread and ordering guarantees |
 | [Changelog](CHANGELOG.md) | What is on `master` so far |
 | [Testing](TESTING.md) | The automated harness and the manual checklist |

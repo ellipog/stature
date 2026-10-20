@@ -81,4 +81,9 @@ public final class StatureFabricGameTests {
     public void foreignScaleModifierNoDrift(GameTestHelper helper) {
         StatureGameTests.foreignScaleModifierNoDrift(helper);
     }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void apiGrowsZombieAndFiresScaleChanged(GameTestHelper helper) {
+        StatureGameTests.apiGrowsZombieAndFiresScaleChanged(helper);
+    }
 }

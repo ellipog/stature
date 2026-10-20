@@ -1,11 +1,15 @@
 package dev.ellipog.stature.common.mixin;
 
+import java.util.Objects;
+
 import dev.ellipog.stature.api.ScaleAxes;
+import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.SaveGate;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.Thresholds;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
@@ -192,9 +196,18 @@ public abstract class EntityMixin {
 
     @Inject(method = "load", at = @At("TAIL"))
     private void stature$loadSize(ValueInput input, CallbackInfo info) {
-        if (!((Object) this instanceof StatureScale scaled)) {
-            return;
+        if ((Object) this instanceof StatureScale scaled) {
+            // One batch so the channel, size, frame and threshold events drain together, after the
+            // load has settled, in the order they were committed.
+            StatureEvents.batch(() -> stature$loadSizeNow(input, scaled));
         }
+    }
+
+    private void stature$loadSizeNow(ValueInput input, StatureScale scaled) {
+        ScaleState beforeState = scaled instanceof LivingEntity beforeLiving
+                ? ScaleService.stateOf(beforeLiving)
+                : null;
+        Identifier beforeFrame = scaled.stature$frame();
 
         float width = input.getFloatOr(KEY_WIDTH, 1.0F);
         float height = input.getFloatOr(KEY_HEIGHT, 1.0F);
@@ -274,6 +287,20 @@ public abstract class EntityMixin {
         Entity self = (Entity) (Object) this;
         self.refreshDimensions();
 
+        // The box and the frame are committed. The events are queued by the batch in the injection
+        // above, so a listener cannot make the broadcasts below send a stale value.
+        if (scaled instanceof LivingEntity loaded) {
+            ScaleState afterState = ScaleService.stateOf(loaded);
+            if (beforeState != null && !beforeState.equals(afterState)) {
+                StatureEvents.fireScaleChanged(
+                        loaded, beforeState, afterState, StatureEvents.Cause.LOAD);
+            }
+            if (!Objects.equals(beforeFrame, scaled.stature$frame())) {
+                StatureEvents.fireFrameChanged(
+                        loaded, beforeFrame, scaled.stature$frame(), StatureEvents.Cause.LOAD);
+            }
+        }
+
         // A load restores the server's truth, but nobody tells the clients: broadcasts only fire
         // on change, and StartTracking never fires for your own player entity. Flag players for
         // the tick-hook re-send, and broadcast now for the mob case, where tracking picks it up.
@@ -288,7 +315,7 @@ public abstract class EntityMixin {
             if (custom) {
                 StatureNetworking.broadcast(living, ScaleService.stateOf(living));
             }
-            StatureConfig.pushThresholds(living);
+            StatureConfig.pushThresholds(living, StatureEvents.Cause.LOAD);
             if (channels) {
                 StatureNetworking.broadcast(living, ChannelService.syncMap(living));
             }

@@ -1,5 +1,7 @@
 package dev.ellipog.stature.common.gametest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import dev.ellipog.stature.api.Easing;
@@ -7,6 +9,8 @@ import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.api.StatureApi;
+import dev.ellipog.stature.common.api.StatureEvents;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureDamageTypes;
 import dev.ellipog.stature.common.StatureScale;
@@ -390,6 +394,61 @@ public final class StatureGameTests {
     }
 
     /**
+     * M9: a third party can grow an entity with only {@link StatureApi} and hear about it with only
+     * {@link StatureEvents}, and the facade's state is what {@code /stature get} reports.
+     *
+     * <p>The body deliberately imports no service: the point of the milestone is that another mod
+     * never has to reach into {@code ScaleService}, {@code FrameService} or the mixin duck. The
+     * command is run as well as the state comparison, because a facade that agreed with itself
+     * while the command reported something else would still be broken.
+     */
+    public static void apiGrowsZombieAndFiresScaleChanged(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        zombie.addTag("stature.api");
+
+        List<ScaleState> from = new ArrayList<>();
+        List<ScaleState> to = new ArrayList<>();
+        List<StatureEvents.Cause> causes = new ArrayList<>();
+        StatureEvents.ScaleChangedListener listener = (entity, before, after, cause) -> {
+            if (entity == zombie) {
+                from.add(before);
+                to.add(after);
+                causes.add(cause);
+            }
+        };
+
+        StatureEvents.SCALE_CHANGED.add(listener);
+        try {
+            StatureApi api = StatureApi.get();
+            ScaleState before = api.state(zombie);
+
+            api.setScale(zombie, 4.0, 0, Easing.LINEAR);
+
+            helper.assertFalse(from.isEmpty(), "StatureApi.setScale fired no SCALE_CHANGED");
+            helper.assertValueEqual(before, from.get(0),
+                    "SCALE_CHANGED from is not the state before the call");
+            helper.assertValueEqual(4.0F, to.get(0).scale(),
+                    "SCALE_CHANGED to is not the requested scale");
+            helper.assertTrue(ScaleAxes.UNIFORM.equals(to.get(0).axes()),
+                    "the facade changed the shape while growing");
+            helper.assertTrue(causes.get(0) == StatureEvents.Cause.API,
+                    "the facade's change did not report the API cause");
+            helper.assertValueEqual(to.get(0), api.state(zombie),
+                    "the facade's state disagrees with the change it just reported");
+
+            int reported = runCommand(
+                    level, "stature get @e[tag=stature.api,limit=1]");
+            helper.assertTrue(reported == 1,
+                    "the facade's state does not agree with what /stature get reports");
+        } finally {
+            StatureEvents.SCALE_CHANGED.remove(listener);
+            zombie.removeTag("stature.api");
+        }
+        helper.succeed();
+    }
+
+    /**
      * M5: a foreign {@code minecraft:scale} modifier multiplies on top of Stature's base and is not
      * folded into it by a later apply.
      */
@@ -505,11 +564,20 @@ public final class StatureGameTests {
         }
     }
 
-    private static void runCommand(ServerLevel level, String command) {
+    private static int runCommand(ServerLevel level, String command) {
         // The source is put in the test level: createCommandSourceStack() starts in the respawn
-        // dimension, and a gametest level need not be that dimension.
+        // dimension, and a gametest level need not be that dimension. The callback is how 26.3
+        // exposes a command's result: performPrefixedCommand itself returns void.
+        int[] result = {-1};
         level.getServer().getCommands().performPrefixedCommand(
-                level.getServer().createCommandSourceStack().withLevel(level), command);
+                level.getServer().createCommandSourceStack().withLevel(level)
+                        .withCallback((success, value) -> {
+                            if (success) {
+                                result[0] = value;
+                            }
+                        }),
+                command);
+        return result[0];
     }
 
     /** Fails the test when this entity lacks the attribute; zombies carry the core set. */

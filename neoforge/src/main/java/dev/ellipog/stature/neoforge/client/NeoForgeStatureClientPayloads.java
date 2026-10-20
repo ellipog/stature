@@ -5,6 +5,7 @@ import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.client.CameraTrauma;
 import dev.ellipog.stature.common.client.ClientViews;
 import dev.ellipog.stature.common.net.AxesPayload;
@@ -52,9 +53,7 @@ public final class NeoForgeStatureClientPayloads {
         event.register(ChannelsPayload.TYPE, (payload, context) -> context.enqueueWork(() -> {
             Entity entity = context.player().level().getEntity(payload.entityId());
             if (entity instanceof LivingEntity living) {
-                StatureScale duck = (StatureScale) living;
-                duck.stature$channelOverrides().clear();
-                duck.stature$channelOverrides().putAll(payload.channels());
+                ChannelService.applyFromServer(living, payload.channels());
             }
         }));
         event.register(PartsPayload.TYPE, (payload, context) -> context.enqueueWork(() -> {
@@ -69,7 +68,8 @@ public final class NeoForgeStatureClientPayloads {
         event.register(ThresholdsPayload.TYPE, (payload, context) -> context.enqueueWork(() -> {
             Entity entity = context.player().level().getEntity(payload.entityId());
             if (entity instanceof LivingEntity living) {
-                ((StatureScale) living).stature$setThresholds(
+                StatureConfig.applyFromServer(
+                        living,
                         new ResolvedThresholds(payload.micro(), payload.macro(), payload.flags()));
             }
         }));
