@@ -74,8 +74,28 @@ public final class Thresholds {
 
     /** Breaking and hurting. Server-only, called from the entity tick hook. */
     public static void tick(LivingEntity entity) {
+        float scale = ScaleService.stateOf(entity).scale();
+        if (!shouldTick(scale, StatureConfig.microOf(entity), StatureConfig.macroOf(entity))) {
+            return;
+        }
         trample(entity);
         doorway(entity);
+    }
+
+    /**
+     * Whether a near-1x entity can possibly be in a tier this tick.
+     *
+     * <p>Both mechanics are tier-gated. Inside the ±10% band a uniform entity is neither micro
+     * nor macro under the default edges, so the scan and the doorway eye lookup cannot do
+     * anything. The guard is expressed against the entity's own resolved edges, not the defaults,
+     * because a frame may move either edge into the band; if it does, the answer stays true and
+     * behaviour is unchanged.
+     */
+    static boolean shouldTick(float scale, float micro, float macro) {
+        if (scale < 0.9F || scale > 1.1F) {
+            return true;
+        }
+        return scale < micro || scale > macro;
     }
 
     /**
