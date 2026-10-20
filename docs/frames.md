@@ -43,6 +43,7 @@ unless they use the same namespace.
 | `parts` | object | Group names mapped to `[x, y, z]` [[part-factor|part factors]] |
 | `hitbox_from_parts` | boolean | When true, the entity's box is derived from the largest part factor on each axis instead of `size`. Default false |
 | `regions` | array | [[hurt-region|hurt regions]], each `{ "part", "multiplier", "tag" }` |
+| `channels` | object | Channel ids mapped to numeric overrides, exactly as `/stature channel` sets them |
 | `thresholds` | object | Per-frame `micro` and `macro` edges plus any threshold flag overrides |
 | `first_person_arms` | boolean | When true, the first-person hands stay vanilla. When absent or false, part factors reach the first-person arms |
 | `comment` | string | Ignored. A note for the pack author |
@@ -76,6 +77,29 @@ A three-number `size` is the only way to ask for a box that is not as deep as it
 `eye_height * uniform scale`. Other poses keep their own proportion: the pose's vanilla eye height
 is scaled by the same ratio the frame applies at standing, so a crawl stays a crawl and the eye
 stays inside the box. Sleeping is left alone.
+
+## Channels
+
+`channels` is an object of channel id to number. Every declared channel is allowed, including the
+physical extras:
+
+```json
+{
+  "size": [1.2, 3.6],
+  "channels": {
+    "stature:projectile_scale": 2.0,
+    "stature:item_pickup_range": 3.0,
+    "stature:riding_offset": 2.0,
+    "stature:explosion_scale": 1.5,
+    "stature:drops_scale": 1.5
+  }
+}
+```
+
+The values are ordinary channel overrides, eased with the frame's easing. Applying a different
+frame removes the overrides the old one introduced, unless an operator changed one of them in the
+meantime; that later choice is preserved. `/stature frame clear` does the same. An unknown channel
+id is logged and skipped, and a non-numeric or non-finite value fails the file.
 
 ## Assignment and precedence
 
