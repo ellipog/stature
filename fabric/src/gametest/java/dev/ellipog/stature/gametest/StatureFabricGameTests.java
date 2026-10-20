@@ -146,4 +146,34 @@ public final class StatureFabricGameTests {
     public void frameCacheAndChannelsStayConsistent(GameTestHelper helper) {
         StatureGameTests.frameCacheAndChannelsStayConsistent(helper);
     }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void builtInPresetsApply(GameTestHelper helper) {
+        StatureGameTests.builtInPresetsApply(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void configPresetsAddAndOverride(GameTestHelper helper) {
+        StatureGameTests.configPresetsAddAndOverride(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void disabledPresetsAreUnavailable(GameTestHelper helper) {
+        StatureGameTests.disabledPresetsAreUnavailable(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void selfShortcutsUseTheCommandEntity(GameTestHelper helper) {
+        StatureGameTests.selfShortcutsUseTheCommandEntity(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void growAndShrinkClampToTheNormalEnvelope(GameTestHelper helper) {
+        StatureGameTests.growAndShrinkClampToTheNormalEnvelope(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void oldCommandSyntaxStillWorks(GameTestHelper helper) {
+        StatureGameTests.oldCommandSyntaxStillWorks(helper);
+    }
 }

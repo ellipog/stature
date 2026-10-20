@@ -83,7 +83,18 @@ public final class NeoForgeStatureGameTests {
             new TestCase("near_one_with_frame_tier_still_runs",
                     StatureGameTests::nearOneWithFrameTierStillRuns),
             new TestCase("frame_cache_and_channels_stay_consistent",
-                    StatureGameTests::frameCacheAndChannelsStayConsistent));
+                    StatureGameTests::frameCacheAndChannelsStayConsistent),
+            new TestCase("built_in_presets_apply", StatureGameTests::builtInPresetsApply),
+            new TestCase("config_presets_add_and_override",
+                    StatureGameTests::configPresetsAddAndOverride),
+            new TestCase("disabled_presets_are_unavailable",
+                    StatureGameTests::disabledPresetsAreUnavailable),
+            new TestCase("self_shortcuts_use_the_command_entity",
+                    StatureGameTests::selfShortcutsUseTheCommandEntity),
+            new TestCase("grow_and_shrink_clamp_to_the_normal_envelope",
+                    StatureGameTests::growAndShrinkClampToTheNormalEnvelope),
+            new TestCase("old_command_syntax_still_works",
+                    StatureGameTests::oldCommandSyntaxStillWorks));
 
     private static final DeferredRegister<Consumer<GameTestHelper>> FUNCTIONS =
             DeferredRegister.create(Registries.TEST_FUNCTION, Stature.MOD_ID);

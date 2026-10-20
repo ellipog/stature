@@ -184,6 +184,26 @@ public final class FrameService {
     public static void setManualShape(
             LivingEntity entity, ScaleAxes axes, int ticks, Easing easing,
             StatureEvents.Cause cause) {
+        setManual(entity, ScaleService.stateOf(entity).withAxes(axes), ticks, easing, cause);
+    }
+
+    /**
+     * Changes scale and shape together for an explicit caller, clearing any named frame.
+     *
+     * <p>One size change rather than a scale change followed by a shape change: a preset that
+     * carries both numbers must not briefly cancel one of the two transitions. The frame is
+     * cleared for the same reason {@link #setManualShape} clears it -- a hand-chosen box replaces
+     * the named proportions rather than editing them.
+     */
+    public static void setManual(
+            LivingEntity entity, ScaleState state, int ticks, Easing easing) {
+        setManual(entity, state, ticks, easing, StatureEvents.Cause.COMMAND);
+    }
+
+    /** The cause-carrying form of {@link #setManual}, used by the facade and the command. */
+    public static void setManual(
+            LivingEntity entity, ScaleState state, int ticks, Easing easing,
+            StatureEvents.Cause cause) {
         StatureScale duck = (StatureScale) entity;
         StatureEvents.batch(() -> {
             Identifier beforeFrame = duck.stature$frame();
@@ -192,8 +212,7 @@ public final class FrameService {
             duck.stature$setFirstPersonVanilla(false);
             clearFrameChannels(entity, cause);
             duck.stature$setFrameSource(FrameSource.MANUAL);
-            ScaleService.setSize(
-                    entity, ScaleService.stateOf(entity).withAxes(axes), ticks, easing, cause);
+            ScaleService.setSize(entity, state, ticks, easing, cause);
             StatureConfig.pushThresholds(entity, cause);
             StatureEvents.fireFrameChanged(entity, beforeFrame, null, cause);
         });

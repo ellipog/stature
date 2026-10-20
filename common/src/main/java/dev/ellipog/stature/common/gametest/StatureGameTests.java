@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gson.JsonParser;
+
 import dev.ellipog.stature.api.Easing;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
@@ -24,12 +26,14 @@ import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.parts.PartService;
 
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.ProblemReporter;
@@ -793,6 +797,346 @@ public final class StatureGameTests {
         helper.succeed();
     }
 
+    /** A built-in size preset and a built-in shape preset, and an unknown name that changes nothing. */
+    public static void builtInPresetsApply(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        zombie.addTag("stature.preset");
+        try {
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature preset @e[tag=stature.preset,limit=1] giant"),
+                    "the giant preset did not run");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(zombie).scale(),
+                    "the giant preset did not apply 4x");
+
+            runCommand(level, "stature preset @e[tag=stature.preset,limit=1] normal");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(zombie).scale(),
+                    "the normal preset did not apply 1x");
+
+            runCommand(level, "stature preset @e[tag=stature.preset,limit=1] tall");
+            helper.assertTrue(new ScaleAxes(0.75F, 1.5F, 0.75F)
+                            .equals(ScaleService.stateOf(zombie).axes()),
+                    "the tall shape preset did not apply its three multipliers");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(zombie).scale(),
+                    "a shape preset changed the uniform scale");
+
+            runCommand(level, "stature preset @e[tag=stature.preset,limit=1] giant");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(zombie).scale(),
+                    "a size preset did not apply after a shape preset");
+            helper.assertTrue(new ScaleAxes(0.75F, 1.5F, 0.75F)
+                            .equals(ScaleService.stateOf(zombie).axes()),
+                    "a size preset discarded the shape the entity already had");
+
+            int unknown = runCommand(level, "stature preset @e[tag=stature.preset,limit=1] missing");
+            helper.assertTrue(unknown <= 0, "an unknown preset reported success");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(zombie).scale(),
+                    "an unknown preset changed the scale");
+        } finally {
+            zombie.removeTag("stature.preset");
+        }
+        helper.succeed();
+    }
+
+    /** A config-defined preset, a custom override of a built-in, and a preset with both numbers. */
+    public static void configPresetsAddAndOverride(GameTestHelper helper) {
+        applyPresetConfig("""
+                {
+                  "presets_custom": {
+                    "kaiju": 6.0,
+                    "giant": {"scale": 5.0},
+                    "boss": {"scale": 3.0, "shape": [1.2, 1.1, 1.2]}
+                  }
+                }
+                """);
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        zombie.addTag("stature.preset");
+        try {
+            runCommand(level, "stature preset @e[tag=stature.preset,limit=1] kaiju");
+            helper.assertValueEqual(6.0F, ScaleService.stateOf(zombie).scale(),
+                    "the config-defined kaiju preset did not apply 6x");
+
+            runCommand(level, "stature preset @e[tag=stature.preset,limit=1] giant");
+            helper.assertValueEqual(5.0F, ScaleService.stateOf(zombie).scale(),
+                    "a custom preset did not override the built-in giant value");
+
+            runCommand(level, "stature preset @e[tag=stature.preset,limit=1] boss");
+            helper.assertValueEqual(3.0F, ScaleService.stateOf(zombie).scale(),
+                    "a both-parts preset did not apply its scale");
+            helper.assertTrue(new ScaleAxes(1.2F, 1.1F, 1.2F)
+                            .equals(ScaleService.stateOf(zombie).axes()),
+                    "a both-parts preset did not apply its shape");
+        } finally {
+            zombie.removeTag("stature.preset");
+            resetPresetConfig();
+        }
+        helper.succeed();
+    }
+
+    /** Turning the feature off hides both applying and listing; turning built-ins off keeps custom. */
+    public static void disabledPresetsAreUnavailable(GameTestHelper helper) {
+        applyPresetConfig("{\"presets_enabled\": false}");
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        zombie.addTag("stature.preset");
+        try {
+            int applied = runCommand(level, "stature preset @e[tag=stature.preset,limit=1] giant");
+            helper.assertTrue(applied <= 0, "a disabled preset feature still applied a preset");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(zombie).scale(),
+                    "a disabled preset feature changed the scale");
+
+            int listed = runCommand(level, "stature preset list");
+            helper.assertTrue(listed <= 0, "a disabled preset feature still listed presets");
+
+            applyPresetConfig("""
+                    {
+                      "presets_enabled": true,
+                      "presets_builtin": false,
+                      "presets_custom": {"kaiju": 6.0}
+                    }
+                    """);
+            int builtIn = runCommand(level, "stature preset @e[tag=stature.preset,limit=1] giant");
+            helper.assertTrue(builtIn <= 0, "a switched-off built-in preset still ran");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(zombie).scale(),
+                    "a switched-off built-in preset changed the scale");
+
+            int custom = runCommand(level, "stature preset @e[tag=stature.preset,limit=1] kaiju");
+            helper.assertValueEqual(1, custom, "the custom preset did not run while built-ins were off");
+            helper.assertValueEqual(6.0F, ScaleService.stateOf(zombie).scale(),
+                    "the custom preset did not apply while built-ins were off");
+        } finally {
+            zombie.removeTag("stature.preset");
+            resetPresetConfig();
+        }
+        helper.succeed();
+    }
+
+    /** Every self-only form, plus the target form of the same commands, from a real player source. */
+    public static void selfShortcutsUseTheCommandEntity(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        CommandSourceStack source = selfSource(level, player);
+        try {
+            helper.assertValueEqual(1, runCommand(source, "stature set --self 4"),
+                    "set --self did not run");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(player).scale(),
+                    "set --self did not change the source player");
+
+            helper.assertValueEqual(1, runCommand(source, "stature preset --self giant"),
+                    "preset --self did not run");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(player).scale(),
+                    "preset --self did not apply to the source player");
+
+            helper.assertValueEqual(1, runCommand(source, "stature get"),
+                    "get with no target did not read the source player");
+
+            helper.assertValueEqual(1, runCommand(source, "stature grow"),
+                    "grow with no target did not run");
+            helper.assertValueEqual(8.0F, ScaleService.stateOf(player).scale(),
+                    "grow with no target did not double the source player");
+
+            helper.assertValueEqual(1, runCommand(source, "stature shrink --self"),
+                    "shrink --self did not run");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(player).scale(),
+                    "shrink --self did not halve the source player");
+
+            helper.assertValueEqual(1, runCommand(source, "stature reset"),
+                    "reset with no target did not run");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(player).scale(),
+                    "reset with no target did not clear the source player");
+
+            helper.assertValueEqual(1, runCommand(source, "stature set @s 2"),
+                    "the old set <targets> syntax stopped working from a player source");
+            helper.assertValueEqual(2.0F, ScaleService.stateOf(player).scale(),
+                    "the old set <targets> syntax did not apply");
+
+            int console = runCommand(level, "stature reset");
+            helper.assertTrue(console <= 0, "a console reset without targets reported success");
+            helper.assertValueEqual(2.0F, ScaleService.stateOf(player).scale(),
+                    "a console reset without targets changed the player");
+
+            // A pack can lower only the self level. A level-0 source can then use the self
+            // forms and a target-less get, while the target forms stay at level 2.
+            applyPresetConfig("{\"self_command_permission_level\": 0}");
+            CommandSourceStack low = level.getServer().createCommandSourceStack()
+                    .withLevel(level)
+                    .withPosition(player.position())
+                    .withEntity(player)
+                    .withPermission(LevelBasedPermissionSet.ALL);
+            helper.assertValueEqual(1, runCommand(low, "stature set --self 2"),
+                    "a lowered self level did not allow set --self");
+            helper.assertValueEqual(2.0F, ScaleService.stateOf(player).scale(),
+                    "a lowered self level did not apply set --self");
+            helper.assertValueEqual(1, runCommand(low, "stature get"),
+                    "a lowered self level did not allow a target-less get");
+            helper.assertTrue(runCommand(low, "stature preset list") > 0,
+                    "a lowered self level could not list the presets it can use");
+            helper.assertTrue(runCommand(low, "stature set @s 3") <= 0,
+                    "a lowered self level opened the target form of set");
+            helper.assertTrue(runCommand(low, "stature reset @s") <= 0,
+                    "a lowered self level opened the target form of reset");
+            helper.assertValueEqual(2.0F, ScaleService.stateOf(player).scale(),
+                    "a refused target form changed the player");
+        } finally {
+            resetPresetConfig();
+            player.discard();
+        }
+        helper.succeed();
+    }
+
+    /** Grow and shrink multiply, clamp at both ends, and clear a dangerous model they replace. */
+    public static void growAndShrinkClampToTheNormalEnvelope(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        zombie.addTag("stature.grow");
+        try {
+            runCommand(level, "stature set @e[tag=stature.grow,limit=1] 2");
+            runCommand(level, "stature grow @e[tag=stature.grow,limit=1]");
+            helper.assertValueEqual(4.0F, ScaleService.stateOf(zombie).scale(),
+                    "grow without a factor did not double the scale");
+
+            runCommand(level, "stature grow @e[tag=stature.grow,limit=1] 4");
+            helper.assertValueEqual(16.0F, ScaleService.stateOf(zombie).scale(),
+                    "grow with a factor did not multiply the scale");
+
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature grow @e[tag=stature.grow,limit=1]"),
+                    "growing at the maximum did not report success");
+            helper.assertValueEqual(16.0F, ScaleService.stateOf(zombie).scale(),
+                    "growing at the maximum left the envelope");
+
+            runCommand(level, "stature shrink @e[tag=stature.grow,limit=1]");
+            helper.assertValueEqual(8.0F, ScaleService.stateOf(zombie).scale(),
+                    "shrink without a factor did not halve the scale");
+
+            runCommand(level, "stature shrink @e[tag=stature.grow,limit=1] 0.0625");
+            helper.assertValueEqual(0.5F, ScaleService.stateOf(zombie).scale(),
+                    "shrink with a factor did not multiply the scale");
+
+            runCommand(level, "stature shrink @e[tag=stature.grow,limit=1] 0.0625");
+            helper.assertValueEqual(0.0625F, ScaleService.stateOf(zombie).scale(),
+                    "shrink did not clamp at the normal minimum");
+
+            runCommand(level, "stature set @e[tag=stature.grow,limit=1] 100 --dangerous");
+            helper.assertTrue(((StatureScale) zombie).stature$dangerousModel(),
+                    "the dangerous set did not mark its model");
+            runCommand(level, "stature grow @e[tag=stature.grow,limit=1]");
+            helper.assertValueEqual(16.0F, ScaleService.stateOf(zombie).scale(),
+                    "grow moved a dangerous box past the envelope");
+            helper.assertFalse(((StatureScale) zombie).stature$dangerousModel(),
+                    "grow left the dangerous model flag behind");
+            helper.assertFalse(((StatureScale) zombie).stature$channelOverrides()
+                            .containsKey(ChannelService.MODEL),
+                    "grow left the dangerous model channel behind");
+        } finally {
+            zombie.removeTag("stature.grow");
+        }
+        helper.succeed();
+    }
+
+    /** The pre-preset syntax, including both dangerous spellings, still parses and runs. */
+    public static void oldCommandSyntaxStillWorks(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityTypes.ZOMBIE, new BlockPos(2, 2, 2));
+        zombie.addTag("stature.old");
+        try {
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature set @e[tag=stature.old,limit=1] 3"),
+                    "set <targets> <scale> did not run");
+            helper.assertValueEqual(3.0F, ScaleService.stateOf(zombie).scale(),
+                    "set <targets> <scale> did not apply");
+
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature set @e[tag=stature.old,limit=1] 2 10 cubic"),
+                    "set <targets> <scale> <ticks> <easing> did not run");
+
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature size @e[tag=stature.old,limit=1] 1 2 1"),
+                    "size <targets> <width> <height> <depth> did not run");
+            helper.assertTrue(new ScaleAxes(1.0F, 2.0F, 1.0F)
+                            .equals(ScaleService.stateOf(zombie).axes()),
+                    "size did not apply its three multipliers");
+
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature set @e[tag=stature.old,limit=1] --dangerous 100"),
+                    "the prefix --dangerous form did not run");
+            helper.assertValueEqual(16.0F, ScaleService.stateOf(zombie).scale(),
+                    "the prefix --dangerous form did not clamp the box");
+            helper.assertTrue(((StatureScale) zombie).stature$dangerousModel(),
+                    "the prefix --dangerous form did not mark the model");
+
+            helper.assertValueEqual(1,
+                    runCommand(level,
+                            "stature set @e[tag=stature.old,limit=1] 4 10 elastic --dangerous"),
+                    "the postfix --dangerous form did not run");
+            helper.assertValueEqual(16.0F, ScaleService.stateOf(zombie).scale(),
+                    "the postfix --dangerous form did not clamp the box");
+
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature set @e[tag=stature.old,limit=1] 1"),
+                    "a plain set did not run after a dangerous set");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(zombie).scale(),
+                    "a plain set did not return the box to 1x");
+            helper.assertFalse(((StatureScale) zombie).stature$dangerousModel(),
+                    "a plain set left the dangerous model flag behind");
+
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature channel @e[tag=stature.old,limit=1] stature:model 2"),
+                    "the old channel syntax did not run");
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature part @e[tag=stature.old,limit=1] head 2 2 2"),
+                    "the old part syntax did not run");
+            helper.assertValueEqual(1,
+                    runCommand(level,
+                            "stature frame apply @e[tag=stature.old,limit=1] stature:gametest_frame"),
+                    "the old frame apply syntax did not run");
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature frame clear @e[tag=stature.old,limit=1]"),
+                    "the old frame clear syntax did not run");
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature get @e[tag=stature.old,limit=1]"),
+                    "the old get syntax did not run");
+            helper.assertValueEqual(1,
+                    runCommand(level, "stature reset @e[tag=stature.old,limit=1]"),
+                    "the old reset syntax did not run");
+            helper.assertValueEqual(1.0F, ScaleService.stateOf(zombie).scale(),
+                    "the old reset syntax did not return the scale to 1x");
+        } finally {
+            zombie.removeTag("stature.old");
+        }
+        helper.succeed();
+    }
+
+    private static void applyPresetConfig(String json) {
+        StatureConfig.apply(JsonParser.parseString(json).getAsJsonObject(), "gametest");
+    }
+
+    /**
+     * Restores the shipped preset defaults after a test changed the shared config. The other keys
+     * are left alone; these are the ones the preset tests move.
+     */
+    private static void resetPresetConfig() {
+        applyPresetConfig("""
+                {
+                  "presets_enabled": true,
+                  "presets_builtin": true,
+                  "presets_disabled": [],
+                  "presets_custom": {},
+                  "relative_commands_enabled": true,
+                  "self_shortcuts_enabled": true,
+                  "self_command_permission_level": 2
+                }
+                """);
+    }
+
+    private static CommandSourceStack selfSource(ServerLevel level, Player player) {
+        return level.getServer().createCommandSourceStack()
+                .withLevel(level)
+                .withPosition(player.position())
+                .withEntity(player)
+                .withPermission(LevelBasedPermissionSet.GAMEMASTER);
+    }
+
     private static int count(List<ItemStack> stacks) {
         return stacks.stream().mapToInt(ItemStack::getCount).sum();
     }
@@ -896,16 +1240,21 @@ public final class StatureGameTests {
 
     private static int runCommand(ServerLevel level, String command) {
         // The source is put in the test level: createCommandSourceStack() starts in the respawn
-        // dimension, and a gametest level need not be that dimension. The callback is how 26.3
-        // exposes a command's result: performPrefixedCommand itself returns void.
+        // dimension, and a gametest level need not be that dimension.
+        return runCommand(level.getServer().createCommandSourceStack().withLevel(level), command);
+    }
+
+    private static int runCommand(CommandSourceStack source, String command) {
+        // The callback is how 26.3 exposes a command's result: performPrefixedCommand itself
+        // returns void. A failed parse or execution leaves the sentinel, which is what the
+        // disabled and no-source tests assert on.
         int[] result = {-1};
-        level.getServer().getCommands().performPrefixedCommand(
-                level.getServer().createCommandSourceStack().withLevel(level)
-                        .withCallback((success, value) -> {
-                            if (success) {
-                                result[0] = value;
-                            }
-                        }),
+        source.getServer().getCommands().performPrefixedCommand(
+                source.withCallback((success, value) -> {
+                    if (success) {
+                        result[0] = value;
+                    }
+                }),
                 command);
         return result[0];
     }
