@@ -2,8 +2,11 @@ package dev.ellipog.stature.common.mixin;
 
 import java.util.Optional;
 
+import dev.ellipog.stature.common.PickupReach;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
+import dev.ellipog.stature.common.channel.ChannelTuning;
 import dev.ellipog.stature.common.parts.HitRegion;
 import dev.ellipog.stature.common.parts.RegionService;
 
@@ -13,6 +16,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 
@@ -40,6 +44,29 @@ public abstract class PlayerMixin {
     private float stature$scaleExhaustion(float amount) {
         float factor = ChannelService.exhaustionMultiplier((LivingEntity) (Object) this);
         return factor == 1.0F ? amount : amount * factor;
+    }
+
+    /**
+     * Expands the one scan vanilla already performs for item and experience pickup.
+     *
+     * <p>Reusing the scan is what keeps this cheap: the enlarged area is handed to the same
+     * {@code getEntities} call, so there is no second query and no per-tick allocation beyond the
+     * box. Client-side scans are left vanilla because pickup is server-authoritative.
+     */
+    @ModifyArg(
+            method = "aiStep",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/level/Level;getEntities(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;)Ljava/util/List;"),
+            index = 1)
+    private AABB stature$scalePickupArea(AABB area) {
+        Player self = (Player) (Object) this;
+        if (self.level().isClientSide()
+                || !StatureConfig.enabled(self, StatureConfig.ITEM_PICKUP_RANGE)) {
+            return area;
+        }
+        float factor = ChannelTuning.factor(self, StatureConfig.ITEM_PICKUP_RANGE_CHANNEL);
+        return PickupReach.area(self.getBoundingBox(), area, factor);
     }
 
     /**
