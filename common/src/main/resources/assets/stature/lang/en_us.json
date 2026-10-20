@@ -31,5 +31,6 @@
     "stature.command.part.badvalue": "Part factors must be positive finite numbers",
     "stature.command.part.list": "%s parts: %s",
     "stature.command.part.list.empty": "%s has no part factors",
+    "argument.entity.options.stature.scale.description": "Stature scale, as a range",
     "death.attack.compression": "%1$s was crushed by their own size"
 }

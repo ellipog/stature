@@ -7,6 +7,8 @@
         "BambooPorousMixin",
         "BarsPorousMixin",
         "EntityMixin",
+        "EntitySelectorOptionsInvoker",
+        "EntitySelectorParserMixin",
         "KnockbackMixin",
         "LivingEntityMixin",
         "PlayerMixin",

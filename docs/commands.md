@@ -37,6 +37,27 @@ sent the result.
 `<easing>` is one of `linear`, `cubic` or `elastic`. Ticks run from 0 to 1200. Without ticks the
 change lands at once; with ticks and no easing name it uses `cubic`.
 
+## Selecting by scale
+
+Any entity selector accepts Stature's option:
+
+```cmd
+/stature set @e[stature:scale=0.5..2] 3
+/stature get @e[stature:scale=..0.25,limit=1]
+/stature reset @e[type=minecraft:zombie,stature:scale=4..]
+```
+
+The value uses vanilla's range grammar: `0.5` is exact, `0.5..2` is inclusive on both ends,
+`..0.5` has only a maximum and `2..` only a minimum. It matches living entities by the same
+uniform scale that `/stature set` writes, not by the drawn model and not by the shaped box. A
+non-living entity never matches because it has no Stature scale. The option is enabled whenever
+Stature is installed; there is no separate config switch, and it combines with every vanilla
+option such as `type`, `tag`, `limit` and `sort`.
+
+No height or tier option is shipped. Both would have to choose between the uniform scale, the
+shaped box and the model, and `stature:scale` already answers the question every command needs.
+Use `stature:scale=0.5..2` for a tier-like query, or a tag for a pack-defined group.
+
 ## Setting a size
 
 ```cmd

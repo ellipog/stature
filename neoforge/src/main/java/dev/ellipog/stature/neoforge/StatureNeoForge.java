@@ -7,6 +7,7 @@ import dev.ellipog.stature.common.StaturePlatform;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
+import dev.ellipog.stature.common.command.StatureEntitySelectors;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureDataReload;
 import dev.ellipog.stature.common.frame.StatureFrames;
@@ -70,8 +71,11 @@ public final class StatureNeoForge {
                 .playToClient(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC)
                 .playToClient(FootstepPayload.TYPE, FootstepPayload.STREAM_CODEC));
 
-        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) ->
-                StatureCommands.register(event.getDispatcher()));
+        NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> {
+            // After vanilla's Bootstrap, before the tree that can contain the selector.
+            StatureEntitySelectors.register();
+            StatureCommands.register(event.getDispatcher());
+        });
 
         // Frames are datapack data, so vanilla /reload must refresh them the same way
         // /stature reload does. This is not a mod-bus event, so it listens on the game

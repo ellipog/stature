@@ -6,6 +6,7 @@ import dev.ellipog.stature.common.StaturePlatform;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
+import dev.ellipog.stature.common.command.StatureEntitySelectors;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureDataReload;
 import dev.ellipog.stature.common.frame.StatureFrames;
@@ -84,8 +85,11 @@ public final class StatureFabric implements ModInitializer {
         StatureNetworking.install(new FabricStatureNetwork());
         StaturePlatform.install(new FabricStaturePlatform());
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-                StatureCommands.register(dispatcher));
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            // After vanilla's Bootstrap, before the tree that can contain the selector.
+            StatureEntitySelectors.register();
+            StatureCommands.register(dispatcher);
+        });
 
         // Frames are datapack data, so vanilla /reload must refresh them the same way
         // /stature reload does. The startup load below stays as the fallback: it runs
