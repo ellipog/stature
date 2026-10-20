@@ -1,6 +1,7 @@
 package dev.ellipog.stature.common.mixin;
 
 import dev.ellipog.stature.api.ScaleAxes;
+import dev.ellipog.stature.common.SaveGate;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.StatureConfig;
@@ -134,7 +135,8 @@ public abstract class EntityMixin {
     }
 
     @Inject(method = "saveWithoutId", at = @At("TAIL"))
-    private void stature$saveSize(ValueOutput output, CallbackInfo info) {        if (!((Object) this instanceof StatureScale scaled)) {
+    private void stature$saveSize(ValueOutput output, CallbackInfo info) {
+        if (!((Object) this instanceof StatureScale scaled)) {
             return;
         }
 
@@ -143,9 +145,9 @@ public abstract class EntityMixin {
         Identifier frame = scaled.stature$frame();
         FrameSource source = scaled.stature$frameSource();
 
-        if (axes.isUniform() && eyeHeight == StatureScale.NO_EYE_HEIGHT && frame == null
-                && (source == FrameSource.NONE || source == FrameSource.DEFAULT)
-                && scaled.stature$channelOverrides().isEmpty()) {
+        if (!SaveGate.shouldWrite(axes, eyeHeight, frame, source,
+                !scaled.stature$channelOverrides().isEmpty(),
+                !scaled.stature$partFactors().isEmpty())) {
             return;
         }
 
@@ -167,7 +169,9 @@ public abstract class EntityMixin {
         output.putInt(KEY_FORMAT, SAVE_FORMAT);
 
         // Overrides travel; easing progress does not. A load lands, it never resumes a glide.
-        ChannelService.save((LivingEntity) (Object) this, output);
+        if ((Object) this instanceof LivingEntity living) {
+            ChannelService.save(living, output);
+        }
         PartService.save(scaled, output);
     }
 
@@ -181,6 +185,12 @@ public abstract class EntityMixin {
         float height = input.getFloatOr(KEY_HEIGHT, 1.0F);
         float depth = input.getFloatOr(KEY_DEPTH, 1.0F);
         float eyeHeight = input.getFloatOr(KEY_EYE, StatureScale.NO_EYE_HEIGHT);
+        if (eyeHeight != StatureScale.NO_EYE_HEIGHT && !(eyeHeight > 0.0F)) {
+            // Zero and negative heights are never a camera: a corrupt save must not park
+            // the eye at the feet, so it degrades to no override like an absent key.
+            STATURE_LOG.warn("ignoring a saved eye height that is not a height; this entity loads vanilla-eyed");
+            eyeHeight = StatureScale.NO_EYE_HEIGHT;
+        }
         Identifier frame = input.getString(KEY_FRAME).map(Identifier::tryParse).orElse(null);
         FrameSource source = input.getString(KEY_SOURCE).map(name -> {
             try {
@@ -236,6 +246,12 @@ public abstract class EntityMixin {
         scaled.stature$setEyeHeight(eyeHeight);
         scaled.stature$setFrame(frame);
         scaled.stature$setFrameSource(source);
+        if (scaled instanceof LivingEntity livingForHands) {
+            // The flag is never saved: the frame is the source of truth, so a load re-reads
+            // it. On the client the registry is empty and this reads false until the parts
+            // packet -- which carries the flag -- replaces it.
+            FrameService.refreshFirstPerson(livingForHands);
+        }
 
         // The dimensions field was built from the entity's type before this ran, so without a
         // refresh the box would stay vanilla until something else happened to reshape it.
@@ -256,10 +272,15 @@ public abstract class EntityMixin {
             if (custom) {
                 StatureNetworking.broadcast(living, ScaleService.stateOf(living));
             }
+            StatureConfig.pushThresholds(living);
             if (channels) {
                 StatureNetworking.broadcast(living, ChannelService.syncMap(living));
             }
-            if (parts) {
+            if (parts || scaled.stature$firstPersonVanilla()) {
+                // The hands flag rides the parts packet, so a framed entity whose silhouette
+                // is otherwise vanilla still has to send it: without this a
+                // first_person_arms frame with no parts would read vanilla on the server
+                // after a load and vanilla everywhere on the clients tracking it.
                 StatureNetworking.broadcastParts(living, PartService.syncMap(living));
             }
         }

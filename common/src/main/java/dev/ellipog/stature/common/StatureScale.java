@@ -136,4 +136,17 @@ public interface StatureScale {
     float stature$eyeHeight();
 
     void stature$setEyeHeight(float eyeHeight);
+
+    /**
+     * This entity's server-resolved threshold tiers and flags, or null.
+     *
+     * <p>Null means "no frame overrides this entity": the configured values apply and
+     * nothing needs sending. Set from the thresholds packet on the client and resolved
+     * server-side on change, so movement gating agrees on both sides without the
+     * client ever seeing the frame registry.
+     */
+    @Nullable
+    ResolvedThresholds stature$thresholds();
+
+    void stature$setThresholds(@Nullable ResolvedThresholds thresholds);
 }

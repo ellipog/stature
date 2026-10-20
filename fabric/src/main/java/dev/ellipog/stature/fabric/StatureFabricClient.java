@@ -1,5 +1,6 @@
 package dev.ellipog.stature.fabric;
 
+import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
@@ -11,6 +12,7 @@ import dev.ellipog.stature.common.net.ConfigPayload;
 import dev.ellipog.stature.common.net.FootstepPayload;
 import dev.ellipog.stature.common.net.HandshakePayload;
 import dev.ellipog.stature.common.net.PartsPayload;
+import dev.ellipog.stature.common.net.ThresholdsPayload;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -65,6 +67,20 @@ public final class StatureFabricClient implements ClientModInitializer {
                         duck.stature$partFactors().clear();
                         duck.stature$partFactors().putAll(payload.parts());
                         duck.stature$setFirstPersonVanilla(payload.firstPersonVanilla());
+                    }
+                }));
+        ClientPlayNetworking.registerGlobalReceiver(ThresholdsPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().level == null) {
+                        return;
+                    }
+                    Entity entity = context.client().level.getEntity(payload.entityId());
+                    if (entity instanceof LivingEntity living) {
+                        // Full replace, like the channels: the server resolved this entity's
+                        // frame over the configured values, and a removal there reads as a
+                        // re-resolve here rather than a merge that keeps the dead key.
+                        ((StatureScale) living).stature$setThresholds(
+                                new ResolvedThresholds(payload.micro(), payload.macro(), payload.flags()));
                     }
                 }));
         ClientPlayNetworking.registerGlobalReceiver(ConfigPayload.TYPE, (payload, context) ->

@@ -91,6 +91,13 @@ public final class FrameCodec {
         float[] size = size(source, json);
         float scale = optionalNumber(source, json, "scale", 1.0F);
         float eyeHeight = optionalNumber(source, json, "eye_height", FrameSpec.NO_EYE_HEIGHT);
+        if (eyeHeight != FrameSpec.NO_EYE_HEIGHT && !(eyeHeight > 0.0F)) {
+            // Zero and negative heights are never a camera: fail the file here, where the
+            // message names the field, rather than in the spec constructor. The loader
+            // logs this as an ignored frame, so the pack author finds it in the log.
+            throw new FrameFormatException(source + ": \"eye_height\" must be a positive number of blocks, got "
+                    + eyeHeight);
+        }
         Easing easing = easing(source, json);
         List<Identifier> entities = ids(source, json, "entities");
         List<TagKey<EntityType<?>>> tags = tags(source, json, "entity_tags");

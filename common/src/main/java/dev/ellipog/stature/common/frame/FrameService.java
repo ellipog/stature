@@ -12,6 +12,7 @@ import dev.ellipog.stature.api.FrameSpec;
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.net.StatureNetworking;
 import dev.ellipog.stature.common.parts.PartService;
@@ -20,6 +21,7 @@ import dev.ellipog.stature.common.parts.RigRegistry;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EntityDimensions;
@@ -108,6 +110,7 @@ public final class FrameService {
         duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
         StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+        StatureConfig.pushThresholds(entity);
         return true;
     }
 
@@ -158,8 +161,10 @@ public final class FrameService {
         StatureScale duck = (StatureScale) entity;
         duck.stature$setFrame(null);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);
+        duck.stature$setFirstPersonVanilla(false);
         duck.stature$setFrameSource(FrameSource.MANUAL);
         ScaleService.setSize(entity, ScaleService.stateOf(entity).withAxes(axes), ticks, easing);
+        StatureConfig.pushThresholds(entity);
     }
 
     /** Forgets the frame and returns the entity to vanilla proportions. */
@@ -173,6 +178,7 @@ public final class FrameService {
         duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
         StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+        StatureConfig.pushThresholds(entity);
     }
 
     /** Applies a pack declaration the first time an undecided server-side entity ticks. */
@@ -192,8 +198,10 @@ public final class FrameService {
         if (duck.stature$frame() != null || !duck.stature$axes().isUniform()
                 || duck.stature$eyeHeight() != StatureScale.NO_EYE_HEIGHT) {
             // Something already chose this entity's size outside the frame system, whether an older
-            // save or a direct API call. Do not let an automatic rule stomp it.
+            // save or a direct API call. Do not let an automatic rule stomp it. The flag still
+            // needs deriving: this path applies no frame, so nothing else would set it.
             duck.stature$setFrameSource(FrameSource.MANUAL);
+            refreshFirstPerson(entity);
             return false;
         }
 
@@ -204,6 +212,22 @@ public final class FrameService {
         }
 
         return applyAs(entity, selection.get().frame(), 0, selection.get().source());
+    }
+
+    /**
+     * Re-reads frames and rigs from these resources, replacing what was there.
+     *
+     * <p>Shared by {@code /stature reload} and the vanilla {@code /reload} listener, so a
+     * datapack edit reaches entities the same way through both. The entity re-evaluation
+     * stays with the caller: the command runs it inline, the listener schedules it on
+     * the server thread after the barrier.
+     *
+     * @return how many frames loaded, which is what the command and the log both report
+     */
+    public static int reloadFrameData(ResourceManager resources) {
+        int count = StatureFrames.load(resources);
+        RigRegistry.instance().load(resources);
+        return count;
     }
 
     /**
@@ -230,6 +254,25 @@ public final class FrameService {
     /** The frame on this entity, if any. */
     public static @Nullable Identifier frameOf(LivingEntity entity) {
         return ((StatureScale) entity).stature$frame();
+    }
+
+    /**
+     * Re-derives the first-person flag from the entity's frame.
+     *
+     * <p>The flag is never saved: the frame is the source of truth, so a load and any
+     * path that settles the source without applying a frame re-read it instead of
+     * trusting a stored copy. An entity with no frame, or whose frame is gone, reads
+     * vanilla hands.
+     */
+    public static void refreshFirstPerson(LivingEntity entity) {
+        StatureScale duck = (StatureScale) entity;
+        Identifier frameId = duck.stature$frame();
+        boolean vanilla = false;
+        if (frameId != null) {
+            FrameFile file = StatureFrames.file(frameId);
+            vanilla = file != null && file.firstPersonArms() != null && file.firstPersonArms();
+        }
+        duck.stature$setFirstPersonVanilla(vanilla);
     }
 
     /** Why the current frame or hand size won. */
@@ -269,6 +312,7 @@ public final class FrameService {
         // and a caller who wants a different scale can follow it with /stature set.
         ScaleService.setSize(entity, new ScaleState(frame.scale(), axes), ticks, frame.easing());
         StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+        StatureConfig.pushThresholds(entity);
         return true;
     }
 
@@ -350,6 +394,7 @@ public final class FrameService {
         duck.stature$partTransitions().clear();
         ScaleService.setSize(entity, ScaleState.UNIFORM, 0, Easing.LINEAR);
         StatureNetworking.broadcastParts(entity, PartService.syncMap(entity));
+        StatureConfig.pushThresholds(entity);
     }
 
 }

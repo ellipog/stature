@@ -2,8 +2,11 @@ package dev.ellipog.stature.fabric;
 
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
+import dev.ellipog.stature.common.frame.FrameService;
+import dev.ellipog.stature.common.frame.StatureDataReload;
 import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
@@ -13,6 +16,7 @@ import dev.ellipog.stature.common.net.ConfigPayload;
 import dev.ellipog.stature.common.net.FootstepPayload;
 import dev.ellipog.stature.common.net.HandshakePayload;
 import dev.ellipog.stature.common.net.PartsPayload;
+import dev.ellipog.stature.common.net.ThresholdsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.fabricmc.api.ModInitializer;
@@ -23,10 +27,12 @@ import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.loader.api.FabricLoader;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.packs.PackType;
 
 import net.minecraft.world.entity.LivingEntity;
 
@@ -69,6 +75,7 @@ public final class StatureFabric implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(AxesPayload.TYPE, AxesPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ChannelsPayload.TYPE, ChannelsPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(PartsPayload.TYPE, PartsPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ThresholdsPayload.TYPE, ThresholdsPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ConfigPayload.TYPE, ConfigPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(FootstepPayload.TYPE, FootstepPayload.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(HandshakePayload.TYPE, HandshakePayload.STREAM_CODEC);
@@ -78,21 +85,34 @@ public final class StatureFabric implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 StatureCommands.register(dispatcher));
 
+        // Frames are datapack data, so vanilla /reload must refresh them the same way
+        // /stature reload does. The startup load below stays as the fallback: it runs
+        // after the listener at startup, and guarantees frames exist either way.
+        ResourceLoader.get(PackType.SERVER_DATA)
+                .registerReloadListener(StatureDataReload.ID, StatureDataReload.listener());
+
         EntityTrackingEvents.START_TRACKING.register((entity, player) -> {
             if (entity instanceof LivingEntity living) {
                 StatureNetworking.sendTo(player, living, ScaleService.stateOf(living));
                 if (ChannelService.hasSyncedState(living)) {
                     StatureNetworking.sendTo(player, living, ChannelService.syncMap(living));
                 }
-                if (PartService.hasParts(living)) {
+                if (PartService.hasParts(living)
+                        || ((StatureScale) living).stature$firstPersonVanilla()) {
                     StatureNetworking.sendPartsTo(player, living, PartService.syncMap(living));
+                }
+                if (FrameService.frameOf(living) != null) {
+                    StatureConfig.sendThresholds(player, living);
                 }
             }
         });
 
         // Frames are data, so they are read once the server's packs are: a datapack's own frames are
         // not available before that, and /stature reload re-reads them after a pack change.
+        // The vanilla /reload listener above runs first; this stays as the fallback and
+        // records the server so that listener can re-evaluate entities after later reloads.
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            StatureDataReload.setServer(server);
             StatureFrames.load(server.getResourceManager());
             RigRegistry.instance().load(server.getResourceManager());
             StatureConfig.load(FabricLoader.getInstance().getConfigDir());

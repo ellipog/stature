@@ -2,6 +2,7 @@ package dev.ellipog.stature.common.net;
 
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.api.ScaleState;
+import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureScale;
 
@@ -47,11 +48,17 @@ public final class StatureNetworking {
         /** One player, for the threshold tiers and flags. */
         void sendTo(ServerPlayer player, ConfigPayload payload);
 
+        /** Everyone who could see this entity, for its resolved thresholds. */
+        void broadcast(LivingEntity entity, ThresholdsPayload payload);
+
+        /** One player, for resolved thresholds they have not been sent yet. */
+        void sendTo(ServerPlayer player, ThresholdsPayload payload);
+
         /** Everyone who could see this entity, for one macro footstep. */
         void broadcast(LivingEntity entity, FootstepPayload payload);
     }
 
-    private static Network installed;
+    private static volatile Network installed;
 
     private StatureNetworking() {
     }
@@ -101,6 +108,20 @@ public final class StatureNetworking {
     public static void sendConfigTo(ServerPlayer player, float micro, float macro, Map<String, Boolean> flags) {
         if (installed != null) {
             installed.sendTo(player, new ConfigPayload(micro, macro, flags));
+        }
+    }
+
+    public static void broadcastThresholds(LivingEntity entity, ResolvedThresholds thresholds) {
+        if (installed != null) {
+            installed.broadcast(entity,
+                    new ThresholdsPayload(entity.getId(), thresholds.micro(), thresholds.macro(), thresholds.flags()));
+        }
+    }
+
+    public static void sendThresholdsTo(ServerPlayer player, LivingEntity entity, ResolvedThresholds thresholds) {
+        if (installed != null) {
+            installed.sendTo(player,
+                    new ThresholdsPayload(entity.getId(), thresholds.micro(), thresholds.macro(), thresholds.flags()));
         }
     }
 

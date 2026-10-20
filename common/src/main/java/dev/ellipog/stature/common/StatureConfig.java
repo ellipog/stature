@@ -17,9 +17,16 @@ import com.google.gson.JsonParser;
 import dev.ellipog.stature.common.frame.FrameFile;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
+import dev.ellipog.stature.common.net.StatureNetworking;
 
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+
+import org.jetbrains.annotations.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,6 +126,15 @@ public final class StatureConfig {
 
     /** Whether this mechanic runs for this entity: its frame may override the file. */
     public static boolean enabled(LivingEntity entity, String mechanic) {
+        // The server's resolved answer wins on both sides: the client never sees the
+        // frame registry, so without this the two sides would gate movement differently.
+        ResolvedThresholds resolved = ((StatureScale) entity).stature$thresholds();
+        if (resolved != null) {
+            Boolean stored = resolved.flags().get(mechanic);
+            if (stored != null) {
+                return stored;
+            }
+        }
         Identifier frameId = FrameService.frameOf(entity);
         if (frameId != null) {
             FrameFile frame = StatureFrames.file(frameId);
@@ -136,6 +152,10 @@ public final class StatureConfig {
 
     /** The micro edge for this entity: its frame may move it. */
     public static float microOf(LivingEntity entity) {
+        ResolvedThresholds resolved = ((StatureScale) entity).stature$thresholds();
+        if (resolved != null) {
+            return resolved.micro();
+        }
         Float override = frameThreshold(entity);
         if (override != null) {
             return override;
@@ -146,12 +166,127 @@ public final class StatureConfig {
     }
 
     public static float macroOf(LivingEntity entity) {
+        ResolvedThresholds resolved = ((StatureScale) entity).stature$thresholds();
+        if (resolved != null) {
+            return resolved.macro();
+        }
         Float override = frameMacro(entity);
         if (override != null) {
             return override;
         }
         synchronized (StatureConfig.class) {
             return macroThreshold;
+        }
+    }
+
+    /**
+     * Resolves this entity's tiers and flags the way the server sends them: the frame
+     * overrides unioned over the configured values.
+     *
+     * <p>Returns null when no frame overrides this entity, in which case the configured
+     * values apply as-is and there is nothing to store or send. Server-side only: it
+     * reads the frame registry, which is empty on the client.
+     */
+    public static @Nullable ResolvedThresholds resolveThresholds(LivingEntity entity) {
+        Identifier frameId = FrameService.frameOf(entity);
+        if (frameId == null) {
+            return null;
+        }
+        FrameFile frame = StatureFrames.file(frameId);
+        if (frame == null) {
+            return null;
+        }
+        if (frame.thresholdMicro() == null && frame.thresholdMacro() == null
+                && frame.thresholdFlags().isEmpty()) {
+            return null;
+        }
+        float micro;
+        float macro;
+        Map<String, Boolean> flags = new LinkedHashMap<>();
+        synchronized (StatureConfig.class) {
+            micro = frame.thresholdMicro() != null ? frame.thresholdMicro() : microThreshold;
+            macro = frame.thresholdMacro() != null ? frame.thresholdMacro() : macroThreshold;
+            for (String key : FLAGS.keySet()) {
+                Boolean override = frame.thresholdFlags().get(key);
+                flags.put(key, override != null ? override : FLAGS.get(key));
+            }
+        }
+        if (!(micro > 0.0F && macro > micro)) {
+            LOG.warn("frame {} declares unusable thresholds (micro {}, macro {}); using the configured edges",
+                    frameId, micro, macro);
+            synchronized (StatureConfig.class) {
+                micro = microThreshold;
+                macro = macroThreshold;
+            }
+        }
+        return new ResolvedThresholds(micro, macro, flags);
+    }
+
+    /**
+     * Stores this entity's resolved thresholds and broadcasts them when they changed.
+     *
+     * <p>Change-detected, so per-tick callers stay quiet: only a new frame, an edited
+     * frame, or a config reload moves anything. An entity whose frame carries no
+     * overrides stores null and -- when it previously stored something -- broadcasts
+     * the configured values once, so clients drop the stale answer. Server-side only.
+     */
+    public static void pushThresholds(LivingEntity entity) {
+        if (entity.level().isClientSide()) {
+            return;
+        }
+        StatureScale duck = (StatureScale) entity;
+        ResolvedThresholds resolved = resolveThresholds(entity);
+        if (java.util.Objects.equals(duck.stature$thresholds(), resolved)) {
+            return;
+        }
+        duck.stature$setThresholds(resolved);
+        StatureNetworking.broadcastThresholds(entity, wireValues(entity, resolved));
+    }
+
+    /**
+     * Sends this entity's thresholds to one player, storing the resolved answer first.
+     *
+     * <p>Unlike {@link #pushThresholds}, this always sends: a viewer who just started
+     * tracking has nothing yet, so "unchanged since last time" is the wrong question.
+     * Only call it for framed entities; anything else reads the config packet the
+     * client already got on login. Server-side only.
+     */
+    public static void sendThresholds(ServerPlayer player, LivingEntity entity) {
+        if (entity.level().isClientSide()) {
+            return;
+        }
+        ResolvedThresholds resolved = resolveThresholds(entity);
+        if (resolved == null) {
+            return;
+        }
+        ((StatureScale) entity).stature$setThresholds(resolved);
+        StatureNetworking.sendThresholdsTo(player, entity, resolved);
+    }
+
+    /**
+     * Re-resolves every living entity's thresholds, broadcasting those that changed.
+     *
+     * <p>Runs after a frame or config reload: an edited frame can drop overrides a
+     * client still holds, and new configured edges move every entity whose frame does
+     * not pin that edge. Quiet when nothing changed.
+     */
+    public static void refreshAllThresholds(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof LivingEntity living) {
+                    pushThresholds(living);
+                }
+            }
+        }
+    }
+
+    /** The values to put on the wire: the resolved answer, or today's configured ones. */
+    private static ResolvedThresholds wireValues(LivingEntity entity, @Nullable ResolvedThresholds resolved) {
+        if (resolved != null) {
+            return resolved;
+        }
+        synchronized (StatureConfig.class) {
+            return new ResolvedThresholds(microThreshold, macroThreshold, Map.copyOf(FLAGS));
         }
     }
 

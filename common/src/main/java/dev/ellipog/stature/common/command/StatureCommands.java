@@ -42,6 +42,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -586,14 +587,18 @@ public final class StatureCommands {
     }
 
     private static int reload(CommandContext<CommandSourceStack> context) {
-        int count = StatureFrames.load(context.getSource().getServer().getResourceManager());
-        RigRegistry.instance().load(context.getSource().getServer().getResourceManager());
+        MinecraftServer server = context.getSource().getServer();
+        // The config file is not datapack data, so vanilla /reload never re-reads it: this
+        // alias does, first, so the shared refresh below resolves every overridden entity
+        // against the new edges rather than the old ones.
         StatureConfig.reload();
-        for (ServerPlayer player : context.getSource().getServer().getPlayerList().getPlayers()) {
+        int count = FrameService.reloadFrameData(server.getResourceManager());
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             StatureNetworking.sendConfigTo(player,
                     StatureConfig.microThreshold(), StatureConfig.macroThreshold(), StatureConfig.flagSnapshot());
         }
-        int updated = FrameService.refreshAutomatic(context.getSource().getServer());
+        int updated = FrameService.refreshAutomatic(server);
+        StatureConfig.refreshAllThresholds(server);
         context.getSource().sendSuccess(
                 () -> Component.translatable("stature.command.reload", count, updated), false);
         return count;

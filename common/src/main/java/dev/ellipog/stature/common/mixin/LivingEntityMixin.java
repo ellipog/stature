@@ -7,7 +7,9 @@ import dev.ellipog.stature.api.ScaleTransition;
 import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
 import dev.ellipog.stature.common.parts.HitRegion;
+import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
+import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.Thresholds;
 import dev.ellipog.stature.common.channel.ChannelService;
@@ -94,6 +96,10 @@ public abstract class LivingEntityMixin implements StatureScale {
 
     @Unique
     private float stature$eyeHeight = NO_EYE_HEIGHT;
+
+    @Unique
+    @Nullable
+    private ResolvedThresholds stature$thresholds;
 
     @Override
     public ScaleTransition stature$transition() {
@@ -221,6 +227,16 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Override
+    public @Nullable ResolvedThresholds stature$thresholds() {
+        return this.stature$thresholds;
+    }
+
+    @Override
+    public void stature$setThresholds(@Nullable ResolvedThresholds thresholds) {
+        this.stature$thresholds = thresholds;
+    }
+
+    @Override
     public void stature$setTarget(ScaleState target, int ticks, Easing easing) {
         LivingEntity self = (LivingEntity) (Object) this;
         this.stature$transition = ScaleTransition.between(
@@ -311,13 +327,17 @@ public abstract class LivingEntityMixin implements StatureScale {
         if (ChannelService.hasSyncedState(self)) {
             StatureNetworking.sendTo(player, self, ChannelService.syncMap(self));
         }
-        if (PartService.hasParts(self)) {
+        if (PartService.hasParts(self) || this.stature$firstPersonVanilla()) {
             StatureNetworking.sendPartsTo(player, self, PartService.syncMap(self));
+        }
+        if (FrameService.frameOf(self) != null) {
+            StatureConfig.sendThresholds(player, self);
         }
     }
 
     @Inject(method = "getDimensions", at = @At("RETURN"), cancellable = true)
-    private void stature$shapeDimensions(Pose pose, CallbackInfoReturnable<EntityDimensions> cir) {        LivingEntity self = (LivingEntity) (Object) this;
+    private void stature$shapeDimensions(Pose pose, CallbackInfoReturnable<EntityDimensions> cir) {
+        LivingEntity self = (LivingEntity) (Object) this;
         EntityDimensions original = cir.getReturnValue();
         EntityDimensions shaped = original;
 
@@ -325,10 +345,23 @@ public abstract class LivingEntityMixin implements StatureScale {
         if (!axes.isUniform()) {
             shaped = shaped.scale(axes.width(), axes.height());
         }
-        if (this.stature$eyeHeight > 0.0F) {
+        if (this.stature$eyeHeight != StatureScale.NO_EYE_HEIGHT && pose != Pose.SLEEPING) {
             // Absolute at scale 1, so the uniform scale multiplies it exactly as it multiplies the
             // frame's size: a frame at 1.65x has its eye height at 1.65x too.
-            shaped = shaped.withEyeHeight(this.stature$eyeHeight * self.getScale());
+            float frameEye = this.stature$eyeHeight;
+            if (pose == Pose.STANDING) {
+                shaped = shaped.withEyeHeight(frameEye * self.getScale());
+            } else {
+                float standingVanilla = self.getType().getDimensions().eyeHeight();
+                if (standingVanilla > 0.0F) {
+                    // Any other posture keeps its own posture: vanilla's pose eye scaled by the
+                    // same ratio the frame applies at standing, so a crawl stays a crawl and
+                    // the eye never leaves the box it belongs to.
+                    shaped = shaped.withEyeHeight(original.eyeHeight() * (frameEye / standingVanilla));
+                } else {
+                    shaped = shaped.withEyeHeight(frameEye * self.getScale());
+                }
+            }
         }
 
         if (shaped != original) {
