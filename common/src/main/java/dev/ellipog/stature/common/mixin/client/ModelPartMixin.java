@@ -5,6 +5,7 @@ import java.util.Map;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import dev.ellipog.stature.api.ScaleAxes;
+import dev.ellipog.stature.common.client.PartPoseScope;
 
 import net.minecraft.client.model.geom.ModelPart;
 
@@ -33,9 +34,9 @@ public abstract class ModelPartMixin {
 
     @Inject(method = "translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", at = @At("TAIL"))
     private void stature$scalePart(PoseStack poseStack, CallbackInfo info) {
-        Map<ModelPart, ScaleAxes> current = ModelFeatureRendererMixin.stature$currentFactors();
+        Map<ModelPart, ScaleAxes> current = PartPoseScope.current();
         if (current == null) {
-            current = ModelFeatureRendererMixin.stature$submitFactors();
+            current = PartPoseScope.submit();
         }
         if (current == null) {
             return;

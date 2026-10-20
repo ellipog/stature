@@ -4,6 +4,7 @@ import java.util.Map;
 
 import dev.ellipog.stature.api.ScaleAxes;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.client.PartPoseScope;
 import dev.ellipog.stature.common.client.RenderSampler;
 import dev.ellipog.stature.common.client.StatureRenderState;
 
@@ -123,10 +124,10 @@ public abstract class LivingEntityRendererMixin {
             if (!factors.isEmpty()) {
                 @SuppressWarnings({"rawtypes", "unchecked"})
                 EntityModel<?> model = ((LivingEntityRenderer) (Object) this).getModel();
-                Map<ModelPart, ScaleAxes> resolved = ModelFeatureRendererMixin.stature$resolveNodes(
+                Map<ModelPart, ScaleAxes> resolved = PartPoseScope.resolveNodes(
                         model.getClass().getSimpleName(), model.root(), factors);
                 if (!resolved.isEmpty()) {
-                    ModelFeatureRendererMixin.stature$setSubmit(resolved);
+                    PartPoseScope.setSubmit(resolved);
                 }
             }
         }
@@ -142,7 +143,7 @@ public abstract class LivingEntityRendererMixin {
             SubmitNodeCollector submitNodeCollector,
             CameraRenderState camera,
             CallbackInfo info) {
-        ModelFeatureRendererMixin.stature$clearSubmit();
+        PartPoseScope.clearSubmit();
     }
 
     @Inject(
