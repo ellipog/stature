@@ -348,23 +348,31 @@ public abstract class EntityMixin {
         // box packet and no channel packet.
         boolean custom = frame != null || eyeHeight != StatureScale.NO_EYE_HEIGHT
                 || width != 1.0F || height != 1.0F || depth != 1.0F;
+        boolean partsOrHands = parts || scaled.stature$firstPersonVanilla();
         if (!self.level().isClientSide() && scaled instanceof LivingEntity living) {
-            if (scaled instanceof ServerPlayer && (custom || channels || parts)) {
-                scaled.stature$setNeedsSync(true);
-            }
-            if (custom) {
-                StaturePackets.broadcast(living, ScaleService.stateOf(living));
-            }
-            StatureConfig.pushThresholds(living, StatureEvents.Cause.LOAD);
-            if (channels) {
-                StaturePackets.broadcast(living, ChannelService.syncMap(living));
-            }
-            if (parts || scaled.stature$firstPersonVanilla()) {
-                // The hands flag rides the parts packet, so a framed entity whose silhouette
-                // is otherwise vanilla still has to send it: without this a
-                // first_person_arms frame with no parts would read vanilla on the server
-                // after a load and vanilla everywhere on the clients tracking it.
-                StaturePackets.broadcastParts(living, PartService.syncMap(living));
+            if (scaled instanceof ServerPlayer) {
+                // A player loads in PrepareSpawnTask, before its connection exists. Sending here
+                // would reach the self leg of sendToTracking with a null connection and kill the
+                // join. The flag makes the tick hook send to the player, and StartTracking tells
+                // everyone else once the entity is in the level, so nothing is lost by waiting.
+                if (custom || channels || partsOrHands) {
+                    scaled.stature$setNeedsSync(true);
+                }
+            } else {
+                if (custom) {
+                    StaturePackets.broadcast(living, ScaleService.stateOf(living));
+                }
+                StatureConfig.pushThresholds(living, StatureEvents.Cause.LOAD);
+                if (channels) {
+                    StaturePackets.broadcast(living, ChannelService.syncMap(living));
+                }
+                if (partsOrHands) {
+                    // The hands flag rides the parts packet, so a framed entity whose silhouette
+                    // is otherwise vanilla still has to send it: without this a
+                    // first_person_arms frame with no parts would read vanilla on the server
+                    // after a load and vanilla everywhere on the clients tracking it.
+                    StaturePackets.broadcastParts(living, PartService.syncMap(living));
+                }
             }
         }
     }
