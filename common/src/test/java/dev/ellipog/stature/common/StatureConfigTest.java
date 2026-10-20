@@ -31,6 +31,8 @@ class StatureConfigTest {
                   "trample_max_per_scan": 8,
                   "trample_drops": true,
                   "seismic_footsteps": true,
+                  "camera_shake_strength": 1.0,
+                  "camera_shake_self_strength": 0.35,
                   "doorway_collision": true,
                   "projectile_scale": true,
                   "projectile_scale_strength": 1.0,
@@ -198,6 +200,28 @@ class StatureConfigTest {
     }
 
     @Test
+    void cameraShakeTuningLoadsAndZeros() {
+        assertEquals(1.0F, StatureConfig.cameraShakeStrength());
+        assertEquals(0.35F, StatureConfig.cameraShakeSelfStrength());
+
+        StatureConfig.apply(JsonParser.parseString("""
+                {
+                  "camera_shake_strength": 0.0,
+                  "camera_shake_self_strength": 0.0
+                }
+                """).getAsJsonObject(), "test");
+        assertEquals(0.0F, StatureConfig.cameraShakeStrength());
+        assertEquals(0.0F, StatureConfig.cameraShakeSelfStrength());
+    }
+
+    @Test
+    void aBadCameraShakeNumberKeepsThePreviousOne() {
+        StatureConfig.apply(JsonParser.parseString(
+                "{\"camera_shake_strength\": 9.0}").getAsJsonObject(), "test");
+        assertEquals(1.0F, StatureConfig.cameraShakeStrength());
+    }
+
+    @Test
     void aBadTuningNumberKeepsThePreviousOne() {
         StatureConfig.apply(JsonParser.parseString(
                 "{\"projectile_scale_max\": 200.0}").getAsJsonObject(), "test");
@@ -249,6 +273,7 @@ class StatureConfigTest {
             for (String key : new String[]{
                     "projectile_scale", "item_pickup_range", "riding_offset",
                     "explosion_scale", "drops_scale", "projectile_scale_min",
+                    "camera_shake_strength", "camera_shake_self_strength",
                     "drops_scale_max", "presets_enabled", "presets_builtin",
                     "presets_disabled", "presets_custom", "relative_commands_enabled",
                     "self_shortcuts_enabled", "self_command_permission_level"}) {

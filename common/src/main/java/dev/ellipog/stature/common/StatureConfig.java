@@ -64,6 +64,8 @@ public final class StatureConfig {
               "trample_max_per_scan": 8,
               "trample_drops": true,
               "seismic_footsteps": true,
+              "camera_shake_strength": 1.0,
+              "camera_shake_self_strength": 0.35,
               "doorway_collision": true,
               "projectile_scale": true,
               "projectile_scale_strength": 1.0,
@@ -157,13 +159,17 @@ public final class StatureConfig {
     }
 
     /**
-     * Numeric tuning for the channels Stature applies itself, rather than through an attribute.
+     * Numeric tuning for the channels Stature applies itself, rather than through an attribute,
+     * plus the camera-shake strengths.
      *
      * <p>Every channel has a strength multiplier for its followed value and a min/max clamp for the
      * resolved factor. The projectile channel also has damage and speed strengths; both default to
-     * a sane multiplication and can be zeroed without disabling the size inheritance.
+     * a sane multiplication and can be zeroed without disabling the size inheritance. The camera
+     * keys are plain multipliers: 0 silences the shake without touching the footstep flag.
      */
     private static final Map<String, Float> TUNING = new LinkedHashMap<>(Map.ofEntries(
+            Map.entry("camera_shake_strength", 1.0F),
+            Map.entry("camera_shake_self_strength", 0.35F),
             Map.entry("projectile_scale_strength", 1.0F),
             Map.entry("projectile_scale_min", 0.25F),
             Map.entry("projectile_scale_max", 4.0F),
@@ -243,6 +249,8 @@ public final class StatureConfig {
     private static int selfCommandPermissionLevel = 2;
 
     private static final Map<String, Bound> BOUNDS = Map.ofEntries(
+            Map.entry("camera_shake_strength", new Bound(0.0F, 4.0F)),
+            Map.entry("camera_shake_self_strength", new Bound(0.0F, 4.0F)),
             Map.entry("projectile_scale_strength", new Bound(0.0F, 4.0F)),
             Map.entry("projectile_scale_min", new Bound(0.001F, 16.0F)),
             Map.entry("projectile_scale_max", new Bound(0.001F, 16.0F)),
@@ -382,6 +390,16 @@ public final class StatureConfig {
                 ? channelId.substring("stature:".length())
                 : channelId;
         return key + suffix;
+    }
+
+    /** The multiplier on all footstep camera shake. Zero turns shake off. */
+    public static float cameraShakeStrength() {
+        return tuning("camera_shake_strength");
+    }
+
+    /** The multiplier on the walker's own footstep shake. Zero turns self shake off. */
+    public static float cameraShakeSelfStrength() {
+        return tuning("camera_shake_self_strength");
     }
 
     /** The damage strength for projectiles, linear against the size factor. */
