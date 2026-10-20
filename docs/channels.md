@@ -91,7 +91,7 @@ overridden. The exponent is what the basis is raised to.
 
 These five channels are applied by Stature itself rather than by a vanilla attribute. They still
 use the normal override system, the normal save and sync, and the normal config gate. Their
-numeric tuning lives in [[stature:thresholds#the-m10-channel-options|the config file]].
+numeric tuning lives in [[stature:thresholds]].
 
 ### Projectiles
 
