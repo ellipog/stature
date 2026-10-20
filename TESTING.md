@@ -21,7 +21,7 @@ world. The last-verified column stays blank until a person has run the row.
 .\gradlew.bat :api:test :common:test
 ```
 
-The game-free suite is 190 tests: 43 in `:api` and 147 in `:common`, including the docs coverage
+The game-free suite is 215 tests: 43 in `:api` and 172 in `:common`, including the docs coverage
 test. `.\gradlew.bat build` runs the same tests, and on Fabric it also runs the server gametests
 because Loom wires `check` to `runGameTest`.
 
@@ -63,7 +63,7 @@ Every other run, and the shipped jar, registers nothing.
 On a fresh checkout, create `neoforge/run/eula.txt` once with `eula=true` (the run directory is
 gitignored).
 
-A green run reports 13 tests on either loader: the 12 Stature bodies below plus vanilla's
+A green run reports 25 tests on either loader: the 24 Stature bodies below plus vanilla's
 `minecraft:always_pass`.
 
 ### Current coverage
@@ -82,6 +82,18 @@ A green run reports 13 tests on either loader: the 12 Stature bodies below plus 
 | `resetClearsEverything` | M5: `/stature reset` clears scale, shape, frame, channels and parts |
 | `foreignScaleModifierNoDrift` | M5: a foreign `minecraft:scale` modifier multiplies on top and is not folded into Stature's base |
 | `apiGrowsZombieAndFiresScaleChanged` | M9: a zombie grown through `StatureApi` alone reports `SCALE_CHANGED` with the right from, to and cause, and the stored state agrees with `/stature get` |
+| `projectileScaleInheritsShooter` | M10: an arrow from a 4x shooter inherits a 4x hitbox, 4x direct damage and a sqrt-curve launch speed |
+| `projectileScaleDisabledIsVanilla` | M10: with the channel disabled, the same arrow keeps the vanilla hitbox, damage and speed |
+| `pickupRangeScales` | M10: a 4x pickup channel reaches an item three blocks away |
+| `pickupRangeDisabledIsVanilla` | M10: with the channel disabled, that item stays on the ground |
+| `scaleSelectorOptionFiltersByScale` | M10: `@e[stature:scale=0.5..2]` and an open-ended range match the right entities; colon syntax parses on both loaders |
+| `ridingOffsetFollowsScaleAndDisables` | M10: a mount's seat scale follows and clamps `riding_offset`, and is vanilla when disabled |
+| `explosionScaleReachesFurther` | M10: a 16x source's explosion reaches a block outside the vanilla radius |
+| `explosionScaleDisabledIsVanilla` | M10: with the channel disabled, that block survives |
+| `dropsScaleMultipliesLootCounts` | M10: a fixed two-item loot table yields six items at the 3x clamp |
+| `dropsScaleDisabledIsVanilla` | M10: the same table yields exactly two when disabled |
+| `nearOneWithFrameTierStillRuns` | M10 performance: the near-1x skip still runs a mechanic when the entity's resolved macro edge is 0.9 |
+| `frameCacheAndChannelsStayConsistent` | M10: the per-tick frame cache invalidates on a frame change, and frame channels are applied and removed with the frame |
 
 ### Structures
 
