@@ -27,6 +27,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * hook reads as the traversal passes each node. Nesting composes for free through the matrix
  * stack, and nothing is stored on the parts themselves, so vanilla's own part scales and the
  * next entity's render are never touched.
+ *
+ * <p>Two scopes, because 26.3 poses in two places. {@code prepareModel} runs deferred with the
+ * model and its state together, which covers the body and everything submitted with it. Layers
+ * like {@code ItemInHandLayer} and {@code CustomHeadLayer} pose parts <em>during</em>
+ * {@code submit} instead, when the prepare scope is already gone: {@code LivingEntityRenderer}'s
+ * submit hook resolves the same map up front and holds it here until {@code RETURN}. The pose
+ * hook prefers the prepare scope and falls back to the submit one.
  */
 @Mixin(ModelFeatureRenderer.class)
 public abstract class ModelFeatureRendererMixin {
@@ -34,6 +41,8 @@ public abstract class ModelFeatureRendererMixin {
     private static final Logger LOG = LoggerFactory.getLogger("stature");
 
     private static final ThreadLocal<Map<ModelPart, ScaleAxes>> CURRENT = new ThreadLocal<>();
+
+    private static final ThreadLocal<Map<ModelPart, ScaleAxes>> SUBMIT = new ThreadLocal<>();
 
     private static final Set<String> WARNED = new HashSet<>();
 
@@ -43,16 +52,45 @@ public abstract class ModelFeatureRendererMixin {
         return CURRENT.get();
     }
 
-    /** Hands a pre-resolved node map to the pose hook. First-person rendering only. */
+    /** The factors for the submit currently layering, or null outside one. */
     @Unique
-    static void stature$setCurrent(Map<ModelPart, ScaleAxes> factors) {
-        CURRENT.set(factors);
+    static Map<ModelPart, ScaleAxes> stature$submitFactors() {
+        return SUBMIT.get();
     }
 
-    /** Drops whatever a render handed over. First-person rendering only. */
+    /** Holds a resolved node map for the layers of the submit now running. */
     @Unique
-    static void stature$clearCurrent() {
-        CURRENT.remove();
+    static void stature$setSubmit(Map<ModelPart, ScaleAxes> factors) {
+        SUBMIT.set(factors);
+    }
+
+    /** Drops whatever a submit handed over. */
+    @Unique
+    static void stature$clearSubmit() {
+        SUBMIT.remove();
+    }
+
+    /**
+     * Walks path-keyed factors down from a model root into nodes. Shared by the prepare hook
+     * below and the submit hook in {@code LivingEntityRenderer}, because both resolve the same
+     * map and only differ in where the model comes from.
+     */
+    @Unique
+    static Map<ModelPart, ScaleAxes> stature$resolveNodes(
+            String modelName, ModelPart root, Map<String, ScaleAxes> factors) {
+        Map<ModelPart, ScaleAxes> resolved = new IdentityHashMap<>();
+        for (Map.Entry<String, ScaleAxes> entry : factors.entrySet()) {
+            ModelPart node = walk(root, entry.getKey());
+            if (node == null) {
+                String key = modelName + "/" + entry.getKey();
+                if (WARNED.add(key)) {
+                    LOG.warn("part path \"{}\" is not on a {}; ignoring it", entry.getKey(), modelName);
+                }
+                continue;
+            }
+            resolved.put(node, entry.getValue());
+        }
+        return resolved;
     }
 
     @Inject(
@@ -68,19 +106,8 @@ public abstract class ModelFeatureRendererMixin {
             return;
         }
 
-        Map<ModelPart, ScaleAxes> resolved = new IdentityHashMap<>();
-        String modelName = submit.model().getClass().getSimpleName();
-        for (Map.Entry<String, ScaleAxes> entry : factors.entrySet()) {
-            ModelPart node = walk(submit.model().root(), entry.getKey());
-            if (node == null) {
-                String key = modelName + "/" + entry.getKey();
-                if (WARNED.add(key)) {
-                    LOG.warn("part path \"{}\" is not on a {}; ignoring it", entry.getKey(), modelName);
-                }
-                continue;
-            }
-            resolved.put(node, entry.getValue());
-        }
+        Map<ModelPart, ScaleAxes> resolved = stature$resolveNodes(
+                submit.model().getClass().getSimpleName(), submit.model().root(), factors);
         if (!resolved.isEmpty()) {
             CURRENT.set(resolved);
         }

@@ -16,7 +16,9 @@
     ],
     "client": [
         "client.AvatarRendererMixin",
+        "client.CameraMixin",
         "client.EntityRenderDispatcherMixin",
+        "client.EntityRendererCullingMixin",
         "client.GameRendererMixin",
         "client.ItemInHandLayerMixin",
         "client.LivingEntityRendererMixin",

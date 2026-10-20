@@ -34,7 +34,7 @@ class RenderMixinContractTest {
     }
 
     @Test
-    void submitHasTheShapeTheMixinRedirects() throws Exception {
+    void submitHasTheShapeTheMixinWraps() throws Exception {
         var method = LivingEntityRenderer.class.getDeclaredMethod(
                 "submit",
                 LivingEntityRenderState.class,
@@ -126,6 +126,62 @@ class RenderMixinContractTest {
                 net.minecraft.resources.Identifier.class,
                 net.minecraft.client.model.geom.ModelPart.class,
                 boolean.class);
+        assertEquals(void.class, method.getReturnType());
+    }
+
+    @Test
+    void firstPersonArmsWrapTheArmNodeSubmit() throws Exception {
+        // Declared on the superinterface; the call site names the receiver type, which is what
+        // the mixin target must match, so both are pinned: resolution and reference.
+        var declared = net.minecraft.client.renderer.OrderedSubmitNodeCollector.class.getDeclaredMethod(
+                "submitModelPart",
+                net.minecraft.client.model.geom.ModelPart.class,
+                PoseStack.class,
+                net.minecraft.client.renderer.rendertype.RenderType.class,
+                int.class,
+                int.class,
+                net.minecraft.client.renderer.texture.UvMapping.class);
+        assertEquals(void.class, declared.getReturnType());
+        var throughReceiver = net.minecraft.client.renderer.SubmitNodeCollector.class.getMethod(
+                "submitModelPart",
+                net.minecraft.client.model.geom.ModelPart.class,
+                PoseStack.class,
+                net.minecraft.client.renderer.rendertype.RenderType.class,
+                int.class,
+                int.class,
+                net.minecraft.client.renderer.texture.UvMapping.class);
+        assertEquals(void.class, throughReceiver.getReturnType());
+    }
+
+    @Test
+    void cullingInflatesFromTheBoundingBox() throws Exception {
+        var method = net.minecraft.client.renderer.entity.EntityRenderer.class.getDeclaredMethod(
+                "getBoundingBoxForCulling", net.minecraft.world.entity.Entity.class, float.class);
+        assertEquals(net.minecraft.world.phys.AABB.class, method.getReturnType());
+    }
+
+    @Test
+    void nearPlaneIsSetInCameraUpdate() throws Exception {
+        var update = net.minecraft.client.Camera.class.getDeclaredMethod(
+                "update", net.minecraft.client.DeltaTracker.class);
+        assertEquals(void.class, update.getReturnType());
+        var setup = net.minecraft.client.Camera.class.getDeclaredMethod(
+                "setupPerspective", float.class, float.class, float.class, float.class, float.class);
+        assertEquals(void.class, setup.getReturnType());
+        var entity = net.minecraft.client.Camera.class.getDeclaredField("entity");
+        assertEquals(net.minecraft.world.entity.Entity.class, entity.getType());
+    }
+
+    @Test
+    void customHeadsSubmitPerLayer() throws Exception {
+        var method = net.minecraft.client.renderer.entity.layers.CustomHeadLayer.class.getDeclaredMethod(
+                "submit",
+                PoseStack.class,
+                SubmitNodeCollector.class,
+                int.class,
+                net.minecraft.client.renderer.entity.state.LivingEntityRenderState.class,
+                float.class,
+                float.class);
         assertEquals(void.class, method.getReturnType());
     }
 

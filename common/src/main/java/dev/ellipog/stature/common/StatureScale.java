@@ -6,6 +6,7 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.api.ScaleTransition;
 import dev.ellipog.stature.api.ChannelTransition;
 import dev.ellipog.stature.api.AxesTransition;
+import dev.ellipog.stature.common.client.RenderSampler;
 import dev.ellipog.stature.common.parts.HitRegion;
 import dev.ellipog.stature.common.frame.FrameSource;
 
@@ -118,6 +119,18 @@ public interface StatureScale {
     boolean stature$firstPersonVanilla();
 
     void stature$setFirstPersonVanilla(boolean vanilla);
+
+    /**
+     * This entity's per-frame render history, client-side only.
+     *
+     * <p>A fresh render state every frame means the state cannot remember the last tick, so
+     * the entity remembers it instead: the client tick samples the visual scale and shape
+     * here, and {@code extractRenderState} blends them at the frame's partial tick. Never
+     * touched on a dedicated server. {@code RenderSampler} is pure math precisely so this
+     * interface -- loaded on both sides -- can name it without dragging a client class
+     * along.
+     */
+    RenderSampler stature$renderSampler();
 
     /**
      * A hit region waiting for damage application, or null. Producers stash it with the current

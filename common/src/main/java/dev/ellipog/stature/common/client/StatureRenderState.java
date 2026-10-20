@@ -12,11 +12,17 @@ import dev.ellipog.stature.api.ScaleAxes;
  * single {@code scale} float and no room for three, so the shape is copied onto the state on the way
  * in and read back on the way out.
  *
- * <p>The game ticks at 20 Hz but draws at display rate, so a value copied once per tick would step
- * visibly mid-ease. Each frame therefore pushes the entity's current tick, scale and shape, and the
- * state answers with the blend between the last two ticks at the frame's partial tick: the hitbox
- * stays exactly on the server's numbers while the picture glides between them, which is the same
- * split vanilla itself uses for positions.
+ * <p>The game ticks at 20 Hz but draws at display rate. Each client entity therefore keeps a
+ * {@link RenderSampler} with the last two ticks' samples, and each frame pushes the blend at its
+ * partial tick here: the hitbox stays exactly on the server's numbers while the picture glides
+ * between them, which is the same split vanilla itself uses for positions. The state itself keeps
+ * no history -- it is rebuilt every frame, so anything remembered on it would never be read.
+ *
+ * <p>Both scales travel because the inventory paperdoll overwrites {@code state.scale} with 1.
+ * The submit hook draws {@code incoming × (visual / attribute) × shape}, so a forced 1 stays 1
+ * and only the shape -- and any {@code stature:model} ratio -- applies. Outside the inventory
+ * the incoming uniform <em>is</em> the attribute scale, so the ratio cancels and the picture is
+ * the blended visual times the shape.
  *
  * <p>Channel overrides ride the same way, one step simpler: they change rarely and nobody blends
  * them, so each frame replaces the whole map rather than versioning it. An empty map copies for
@@ -28,16 +34,23 @@ import dev.ellipog.stature.api.ScaleAxes;
 public interface StatureRenderState {
 
     /**
-     * Records one frame's sample. Called from {@code extractRenderState}, which always runs before
-     * {@code submit} for the same frame.
+     * Records this frame's blended sample. Called from {@code extractRenderState}, which always
+     * runs before {@code submit} for the same frame.
+     *
+     * @param visualScale    the blended visual scale ({@code stature:model} or the base)
+     * @param attributeScale the entity's base scale this tick, for the inventory ratio
+     * @param shape          the blended shape
      */
-    void stature$pushFrame(int tick, float partialTick, float scale, ScaleAxes shape);
+    void stature$pushVisual(float visualScale, float attributeScale, ScaleAxes shape);
 
-    /** The uniform scale blended to this frame, or 1.0 when nothing has been pushed yet. */
-    float stature$renderScale();
+    /** The blended visual scale, or 1.0 when nothing has been pushed yet. */
+    float stature$visualScale();
 
-    /** The shape blended to this frame, or {@link ScaleAxes#UNIFORM} when nothing is pushed yet. */
-    ScaleAxes stature$renderShape();
+    /** The base scale sampled alongside the visual, or 1.0 when nothing is pushed yet. */
+    float stature$attributeScale();
+
+    /** The blended shape, or {@link ScaleAxes#UNIFORM} when nothing is pushed yet. */
+    ScaleAxes stature$visualShape();
 
     /** The channel overrides known this frame. Replaced whole, never merged. */
     void stature$pushChannels(Map<String, Float> channels);

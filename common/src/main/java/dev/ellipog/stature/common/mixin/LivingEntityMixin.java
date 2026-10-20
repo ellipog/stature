@@ -13,6 +13,7 @@ import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.Thresholds;
 import dev.ellipog.stature.common.channel.ChannelService;
+import dev.ellipog.stature.common.client.RenderSampler;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.FrameSource;
@@ -96,6 +97,9 @@ public abstract class LivingEntityMixin implements StatureScale {
 
     @Unique
     private float stature$eyeHeight = NO_EYE_HEIGHT;
+
+    @Unique
+    private RenderSampler stature$sampler;
 
     @Unique
     @Nullable
@@ -237,6 +241,14 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Override
+    public RenderSampler stature$renderSampler() {
+        if (this.stature$sampler == null) {
+            this.stature$sampler = new RenderSampler();
+        }
+        return this.stature$sampler;
+    }
+
+    @Override
     public void stature$setTarget(ScaleState target, int ticks, Easing easing) {
         LivingEntity self = (LivingEntity) (Object) this;
         this.stature$transition = ScaleTransition.between(
@@ -259,6 +271,12 @@ public abstract class LivingEntityMixin implements StatureScale {
             PartService.tick(self);
             Thresholds.tick(self);
             stature$syncSelf(self);
+        } else {
+            // Render history lives on the entity because the state is rebuilt every frame:
+            // sampling the visual scale and shape here lets extractRenderState blend them
+            // at the frame's partial tick instead of stepping at 20 Hz. Pure math, so the
+            // server carrying this field costs nothing but the object itself.
+            stature$renderSampler().tick(ChannelService.visualScale(self, self.getScale()), stature$axes());
         }
         if (this.stature$transition == null || this.stature$transition.isDone()) {
             return;

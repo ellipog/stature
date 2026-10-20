@@ -21,6 +21,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * future version adds keep working underneath. Armor, elytra and held layers follow for free
  * because they traverse the same nodes, which is exactly why the seam is here rather than in any
  * one renderer.
+ *
+ * <p>Two scopes feed it. The prepare scope covers the body and everything submitted with a state;
+ * the submit scope covers layers that pose parts during {@code submit}, when the prepare scope
+ * is already gone -- {@code ItemInHandLayer.translateToHand} and {@code CustomHeadLayer} both
+ * pass through here. The prepare scope wins when both are present, which only happens if a
+ * submit nests inside a consumption.
  */
 @Mixin(ModelPart.class)
 public abstract class ModelPartMixin {
@@ -28,6 +34,9 @@ public abstract class ModelPartMixin {
     @Inject(method = "translateAndRotate(Lcom/mojang/blaze3d/vertex/PoseStack;)V", at = @At("TAIL"))
     private void stature$scalePart(PoseStack poseStack, CallbackInfo info) {
         Map<ModelPart, ScaleAxes> current = ModelFeatureRendererMixin.stature$currentFactors();
+        if (current == null) {
+            current = ModelFeatureRendererMixin.stature$submitFactors();
+        }
         if (current == null) {
             return;
         }
