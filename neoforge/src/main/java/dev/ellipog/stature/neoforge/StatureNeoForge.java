@@ -3,7 +3,6 @@ package dev.ellipog.stature.neoforge;
 import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
-import dev.ellipog.stature.common.StaturePlatform;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -61,7 +60,6 @@ public final class StatureNeoForge {
         NeoForgeStatureGameTests.register(modEventBus);
 
         StatureNetworking.install(new NeoForgeStatureNetwork());
-        StaturePlatform.install(new NeoForgeStaturePlatform());
 
         modEventBus.addListener((RegisterPayloadHandlersEvent event) -> event.registrar("1")
                 .playToClient(AxesPayload.TYPE, AxesPayload.STREAM_CODEC)

@@ -1,5 +1,7 @@
 package dev.ellipog.stature.common;
 
+import dev.ellipog.armature.api.ArmatureApi;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -141,7 +143,7 @@ public final class Thresholds {
                 continue;
             }
             BlockPos immutable = pos.immutable();
-            if (!StaturePlatform.mayBreak(level, immutable, state, entity)) {
+            if (!ArmatureApi.platform().mayBreak(level, immutable, state, entity)) {
                 continue;
             }
             if (level.destroyBlock(immutable, drops, entity)) {

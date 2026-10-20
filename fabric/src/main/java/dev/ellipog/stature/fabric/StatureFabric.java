@@ -2,7 +2,6 @@ package dev.ellipog.stature.fabric;
 
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
-import dev.ellipog.stature.common.StaturePlatform;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -83,7 +82,6 @@ public final class StatureFabric implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(HandshakePayload.TYPE, HandshakePayload.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(HandshakePayload.TYPE, HandshakePayload.STREAM_CODEC);
         StatureNetworking.install(new FabricStatureNetwork());
-        StaturePlatform.install(new FabricStaturePlatform());
 
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             // After vanilla's Bootstrap, before the tree that can contain the selector.
