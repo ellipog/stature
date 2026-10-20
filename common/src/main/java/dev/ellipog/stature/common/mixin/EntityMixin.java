@@ -79,6 +79,8 @@ public abstract class EntityMixin {
 
     private static final String KEY_SOURCE = "stature_frame_source";
 
+    private static final String KEY_DANGEROUS_MODEL = "stature_dangerous_model";
+
     private static final String KEY_FORMAT = "stature_format";
 
     /**
@@ -103,12 +105,13 @@ public abstract class EntityMixin {
                 && StatureConfig.enabled(living, StatureConfig.SEISMIC_FOOTSTEPS)
                 && StatureConfig.isMacro(living)) {
             SoundType soundType = blockState.getSoundType();
+            float volume = soundType.getVolume() * Thresholds.stepVolume(living, 0.15F);
             living.playSound(soundType.getStepSound(),
-                    soundType.getVolume() * Thresholds.stepVolume(living, 0.15F),
+                    volume,
                     soundType.getPitch() * Thresholds.stepPitch(living, 1.0F));
             info.cancel();
             if (!living.level().isClientSide()) {
-                StatureNetworking.broadcastFootstep(living);
+                StatureNetworking.broadcastFootstep(living, volume);
             }
         }
     }
@@ -165,6 +168,12 @@ public abstract class EntityMixin {
                 || source == FrameSource.INTEGRATION
                 || source == FrameSource.TAG || source == FrameSource.TYPE) {
             output.putString(KEY_SOURCE, source.name());
+        }
+        if (scaled.stature$dangerousModel()) {
+            // A dangerous model is a channel override, so the channels leg above already makes
+            // this entity save. The flag travels too: without it a relog would make a later
+            // plain /stature set keep the old dangerous model.
+            output.putBoolean(KEY_DANGEROUS_MODEL, true);
         }
         output.putInt(KEY_FORMAT, SAVE_FORMAT);
 
@@ -246,6 +255,7 @@ public abstract class EntityMixin {
         scaled.stature$setEyeHeight(eyeHeight);
         scaled.stature$setFrame(frame);
         scaled.stature$setFrameSource(source);
+        scaled.stature$setDangerousModel(input.getBooleanOr(KEY_DANGEROUS_MODEL, false));
         if (scaled instanceof LivingEntity livingForHands) {
             // The flag is never saved: the frame is the source of truth, so a load re-reads
             // it. On the client the registry is empty and this reads false until the parts

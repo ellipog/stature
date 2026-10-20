@@ -57,6 +57,10 @@ public abstract class PlayerMixin {
             return;
         }
         AttributeInstance reach = self.getAttribute(Attributes.ENTITY_INTERACTION_RANGE);
+        // +1.0, not +0.5: the server's attack path measures to the hitbox edge while the
+        // client's view vector can land a fraction outside it, so the fudge is what keeps a
+        // legitimate edge hit stashable. It is a raycast budget, not a reach extension: the
+        // hit must still land on this exact victim for the region to be stashed.
         double distance = (reach == null ? 4.5 : reach.getValue()) + 1.0;
         HitResult hit = ProjectileUtil.getHitResultOnViewVector(self, entity -> entity == target, distance);
         if (hit instanceof EntityHitResult entityHit && entityHit.getEntity() == target) {

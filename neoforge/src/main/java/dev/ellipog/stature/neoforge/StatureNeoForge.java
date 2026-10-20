@@ -4,6 +4,7 @@ import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.StaturePlatform;
 import dev.ellipog.stature.common.client.CameraTrauma;
 import dev.ellipog.stature.common.client.ClientViews;
 import dev.ellipog.stature.common.StatureScale;
@@ -63,6 +64,7 @@ public final class StatureNeoForge {
         NeoForgeStatureGameTests.register(modEventBus);
 
         StatureNetworking.install(new NeoForgeStatureNetwork());
+        StaturePlatform.install(new NeoForgeStaturePlatform());
 
         modEventBus.addListener((RegisterPayloadHandlersEvent event) ->
                 event.registrar("1").playToClient(AxesPayload.TYPE, AxesPayload.STREAM_CODEC,
@@ -103,7 +105,8 @@ public final class StatureNeoForge {
                             Vec3 camera = ClientViews.cameraPosition();
                             if (camera != null) {
                                 CameraTrauma.addShake(
-                                        payload.x(), payload.y(), payload.z(), payload.scale(), camera);
+                                        payload.x(), payload.y(), payload.z(), payload.scale(), camera,
+                                        ClientViews.screenEffectScale());
                             }
                         })));
 

@@ -47,6 +47,7 @@ public abstract class ServerPlayerMixin {
         // The hands flag is never saved, so death would otherwise reset it: the frame
         // survives here, and the flag travels with it like the parts below.
         duck.stature$setFirstPersonVanilla(oldDuck.stature$firstPersonVanilla());
+        duck.stature$setDangerousModel(oldDuck.stature$dangerousModel());
         duck.stature$setThresholds(oldDuck.stature$thresholds());
         // Part factors travel with the surviving sources below; anything else re-resolves its
         // frame on first tick, which re-applies its parts. Transitions never travel.

@@ -69,16 +69,24 @@ is gitignored). CI does the same, per plan Q14.
 | `eyeInsideBoxForEveryPose` | M2-4: a frame eye override stays inside the box in every pose and is exact at standing |
 | `framedThresholdsResolvedPerEntity` | M2-3, server half: a frame-less entity resolves nothing, a resolved answer wins, and dropping it returns the entity to the file values |
 | `uniformScaleSurvivesSave` | M2: the uniform scale and the axes survive a save and load |
+| `trampleRespectsMobGriefing` | M5: a 16x zombie breaks no leaves with `mob_griefing` false and a capped handful with it true |
+| `trampleCappedPerScan` | M5: one trample scan destroys at most the default cap of 8 |
+| `growInTunnelEndsInAir` | M5: growing 1x to 16x in a 3-high tunnel ends outside it, with at most one compression hit |
+| `dangerousModelResetOnPlainSet` | M5: `100 --dangerous` then a plain `1` gives a 1x model, not a leftover 100x channel |
+| `resetClearsEverything` | M5: `/stature reset` clears scale, shape, frame, channels and parts |
+| `foreignScaleModifierNoDrift` | M5: a foreign `minecraft:scale` modifier multiplies on top and is not folded into Stature's base |
 
 Each loader also runs vanilla's `minecraft:always_pass`, so a green run reports one more test than
-this table. The count is the check: six on each loader means all five Stature bodies registered.
+this table. The count is the check: twelve on each loader means all eleven Stature bodies registered.
 
 ### Structures
 
-The tests use `minecraft:empty` with padding and open air, which is all the current bodies need.
-When M5's trample and displacement tests need a floor, add
-`data/stature/structure/arena_32.nbt` (a stone floor about 32x24x32) and point those tests at it
-instead of inventing a structure in code. Fabric can also read `.snbt` from `gametest/structure/`.
+The tests use `minecraft:empty` with padding and build their fixture in code: the M5 bodies clear
+a volume first, because the gametest level is a real world with terrain and an uncleared spawn can
+be displaced before the test measures anything. The leaf field is 13x13 and the tunnel is 5 blocks
+long with a six-layer roof, both inside the padding the loader registrations give them. A shipped
+`data/stature/structure/arena_32.nbt` is still the cleaner long-term answer; it is not needed while
+these fixtures fit.
 
 ## Fabric client gametests
 

@@ -14,6 +14,7 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
 import dev.ellipog.stature.common.StatureScale;
+import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.StatureNetworking;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
@@ -170,6 +171,11 @@ public final class FrameService {
     /** Forgets the frame and returns the entity to vanilla proportions. */
     public static void clear(LivingEntity entity) {
         StatureScale duck = (StatureScale) entity;
+        if (duck.stature$dangerousModel()) {
+            // The dangerous model is a visual leftover, not a frame: clearing a frame should not
+            // leave the entity drawn at 100x while its box is vanilla again.
+            ChannelService.resetChannel(entity, ChannelService.MODEL);
+        }
         duck.stature$setFrame(null);
         duck.stature$setFrameSource(FrameSource.MANUAL);
         duck.stature$setEyeHeight(StatureScale.NO_EYE_HEIGHT);

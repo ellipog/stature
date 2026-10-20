@@ -1,5 +1,8 @@
 package dev.ellipog.stature.fabric;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 import dev.ellipog.stature.common.net.AxesPayload;
 import dev.ellipog.stature.common.net.ChannelsPayload;
 import dev.ellipog.stature.common.net.ConfigPayload;
@@ -8,28 +11,28 @@ import dev.ellipog.stature.common.net.PartsPayload;
 import dev.ellipog.stature.common.net.ThresholdsPayload;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The Fabric half of the size sync.
  *
- * <p>Broadcast goes to everyone in the dimension rather than to a tracking set: Stature's packet is
- * sent when a shape changes and not once per tick, and asking the level for its players is a line of
- * code that cannot disagree with the server's own tracking bookkeeping. A client that can see the
- * dimension and does not care about the entity discards thirty bytes.
+ * <p>Sends go to the players actually tracking the entity, plus the entity itself when it is a
+ * player: your own entity never appears in your tracking set, so without the self leg a player's
+ * own shape would only arrive through the twenty-tick re-send. A footstep goes to players within
+ * its audible radius instead of the whole dimension. Before M5 both used {@code level.players()},
+ * which broadcast every shape and every step to everyone in the dimension.
  */
 final class FabricStatureNetwork implements StatureNetworking.Network {
 
     @Override
     public void broadcast(LivingEntity entity, AxesPayload payload) {
-        if (entity.level() instanceof ServerLevel level) {
-            for (ServerPlayer player : level.players()) {
-                ServerPlayNetworking.send(player, payload);
-            }
-        }
+        send(entity, payload);
     }
 
     @Override
@@ -39,11 +42,7 @@ final class FabricStatureNetwork implements StatureNetworking.Network {
 
     @Override
     public void broadcast(LivingEntity entity, ChannelsPayload payload) {
-        if (entity.level() instanceof ServerLevel level) {
-            for (ServerPlayer player : level.players()) {
-                ServerPlayNetworking.send(player, payload);
-            }
-        }
+        send(entity, payload);
     }
 
     @Override
@@ -53,11 +52,7 @@ final class FabricStatureNetwork implements StatureNetworking.Network {
 
     @Override
     public void broadcast(LivingEntity entity, PartsPayload payload) {
-        if (entity.level() instanceof ServerLevel level) {
-            for (ServerPlayer player : level.players()) {
-                ServerPlayNetworking.send(player, payload);
-            }
-        }
+        send(entity, payload);
     }
 
     @Override
@@ -72,11 +67,7 @@ final class FabricStatureNetwork implements StatureNetworking.Network {
 
     @Override
     public void broadcast(LivingEntity entity, ThresholdsPayload payload) {
-        if (entity.level() instanceof ServerLevel level) {
-            for (ServerPlayer player : level.players()) {
-                ServerPlayNetworking.send(player, payload);
-            }
-        }
+        send(entity, payload);
     }
 
     @Override
@@ -85,11 +76,25 @@ final class FabricStatureNetwork implements StatureNetworking.Network {
     }
 
     @Override
-    public void broadcast(LivingEntity entity, FootstepPayload payload) {
-        if (entity.level() instanceof ServerLevel level) {
-            for (ServerPlayer player : level.players()) {
-                ServerPlayNetworking.send(player, payload);
-            }
+    public void sendNear(ServerLevel level, double x, double y, double z, double radius,
+            FootstepPayload payload) {
+        for (ServerPlayer player : PlayerLookup.around(level, new Vec3(x, y, z), radius)) {
+            ServerPlayNetworking.send(player, payload);
+        }
+    }
+
+    private static void send(LivingEntity entity, CustomPacketPayload payload) {
+        if (!(entity.level() instanceof ServerLevel)) {
+            return;
+        }
+        Set<ServerPlayer> viewers = new LinkedHashSet<>(PlayerLookup.tracking(entity));
+        if (entity instanceof ServerPlayer self) {
+            // PlayerLookup.tracking excludes the player themselves. The self leg is what makes
+            // /stature set @s visible to @s without waiting for the periodic self re-send.
+            viewers.add(self);
+        }
+        for (ServerPlayer player : viewers) {
+            ServerPlayNetworking.send(player, payload);
         }
     }
 }

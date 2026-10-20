@@ -173,14 +173,19 @@ that degrades to a normal hit past walls or out of reach. Measured: equal-speed 
   "macro_threshold": 2.5,
   "surface_climbing": true,
   "trampling": true,
+  "trample_max_per_scan": 8,
+  "trample_drops": true,
   "doorway_collision": true
 }
 ```
 
 `config/stature.json` holds the two tier edges and a flag per mechanic; frames override any
 of them per entity. Below micro, walls climb like ladders and bars, fences and bamboo let
-small things through (panes stay walls). Above macro, leaves, panes and crops break on
-contact, low ceilings compress for 2.0 every second, and footsteps land louder and deeper.
+small things through (panes stay walls). Above macro, leaves, panes and crops underfoot
+break on contact, low ceilings compress for 2.0 every second, and footsteps land louder and
+deeper. Trample scans every fourth tick, reads only the lower third of the box plus the foot
+layer, and destroys at most `trample_max_per_scan` blocks per scan; every break passes the
+loader's permission seam, so claims, spawn protection and `mob_griefing` are respected.
 Knockback already followed the root law at every scale, so its flag only disables the
 follow. Measured: a 0.2 zombie fell through bars onto stone while a vanilla one landed on
 top, a macro zombie cleared leaves and wheat, and died under a solid eye slab in twelve
@@ -189,22 +194,29 @@ seconds.
 ## Beyond the envelope
 
 ```cmd
+/stature set <targets> <scale> [ticks] [easing] --dangerous
 /stature set <targets> --dangerous <scale> [ticks] [easing]
+/stature reset <targets>
 ```
 
 The command clamps to what the attribute holds (0.0625 to 16.0). Past that, the box keeps
 the nearest bound and the model channel shows the rest: a 100x looks 100x with a 16x box
-rather than freezing physics, and the look stays until its channel is reset. Growing
-inside rock pops out to the nearest air instead, or takes compression when truly encased.
-Measured: a pocketed zombie landed on the roof at double height, and a 100x read 16x on
-the box with the model carrying the rest.
+rather than freezing physics. The dangerous range is 0.001 to 1000 and logs a warning above
+256. A plain `set` or `reset` clears a dangerous model, while a model set by hand through the
+channel command survives. `reset` forgets scale, shape, frame, channels and parts in one
+command. Growing inside rock pops out to the nearest air instead, or takes compression when
+truly encased; the search is capped at 64 whole-box candidates and hurts at most once per
+transition. Measured: a pocketed zombie landed on the roof at double height, and a 100x read
+16x on the box with the model carrying the rest.
 
 ## Peers
 
 A Fabric client without the mod is asked on join and refused after ten silent seconds;
 a NeoForge client is refused by the platform's own mod list first. Either way nobody
-renders or collides against wrong sizes. Macro footsteps shake nearby cameras with
-distance falloff, riding the walk-bob toggle so comfort settings govern it too.
+renders or collides against wrong sizes. Size, channel, part and threshold packets go to
+the players tracking the entity plus the entity itself, not the whole dimension. Macro
+footsteps shake nearby cameras within 48 blocks with smooth falloff, riding the walk-bob
+toggle and the vanilla Screen Effect slider so comfort settings govern them too.
 
 **Seen by tests, not yet by eyes:** the per-axis *drawing* half. 26.3 renders a state rather than an
 entity, so the shape is copied onto `LivingEntityRenderState` in `extractRenderState` and applied

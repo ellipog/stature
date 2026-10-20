@@ -23,6 +23,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * location: downstream the subclasses keep only the entity. The stash is spent moments later
  * at damage time, in the same tick, so a location that never becomes damage evaporates on its
  * own. Client-side hits stash nothing; the client never applies damage.
+ *
+ * <p>Two projectiles that hit the same victim in one tick both write the same field: the last
+ * hit wins. That is deliberate and documented rather than a queue, because damage is applied
+ * once per hit in the same tick and the alternative is a per-tick list for a case vanilla
+ * already resolves by ignoring the extra hit's cooldown.
  */
 @Mixin(Projectile.class)
 public abstract class ProjectileMixin {

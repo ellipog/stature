@@ -30,7 +30,6 @@ import dev.ellipog.stature.common.channel.ChannelRegistry;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.parts.PartService;
 import dev.ellipog.stature.common.parts.RigRegistry;
-import dev.ellipog.stature.common.parts.RigRegistry;
 import dev.ellipog.stature.common.frame.FrameService;
 import dev.ellipog.stature.common.frame.StatureFrames;
 import dev.ellipog.stature.common.net.StatureNetworking;
@@ -49,12 +48,17 @@ import net.minecraft.world.entity.LivingEntity;
 
 import org.jetbrains.annotations.Nullable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * The {@code /stature} command tree (plan §14.5 and §14.8).
  *
  * <pre>
  * /stature set    &lt;targets&gt; &lt;scale&gt;                        instantly
  * /stature set    &lt;targets&gt; &lt;scale&gt; &lt;ticks&gt; [easing]         eased
+ * /stature set    &lt;targets&gt; &lt;scale&gt; --dangerous               past the envelope (suffix or prefix)
+ * /stature reset  &lt;targets&gt;                                  scale, shape, channels and parts
  * /stature size   &lt;targets&gt; &lt;width&gt; &lt;height&gt; &lt;depth&gt; [ticks]  the box's shape
  * /stature frame  apply &lt;targets&gt; &lt;frame&gt; [ticks]            a frame from a data pack
  * /stature frame  clear &lt;targets&gt;                            back to vanilla proportions
@@ -66,10 +70,11 @@ import org.jetbrains.annotations.Nullable;
  * /stature reload                                            re-read the packs
  * </pre>
  *
- * <p>The scale argument is bounded by Brigadier to {@link ScaleLimits}, so an out-of-range number is
- * refused before any code here runs and the message names the range rather than the caller's mistake.
- * That is also the limit of the guard: the API behind this is unbound (§14.5), and the clamp is the
- * command's job, not the service's policy.
+ * <p>The scale argument is parsed across the dangerous range so the suffix can be seen at all;
+ * {@link #set} then refuses a value outside {@link ScaleLimits} with a message that names
+ * {@code --dangerous}, and the dangerous path clamps the box. That is also the limit of the guard:
+ * the API behind this is unbound (§14.5), and the clamp is the command's job, not the service's
+ * policy.
  *
  * <p>{@code set}, {@code size} and {@code frame} are separate commands rather than one with optional
  * parts, because they are separate ideas: one changes how big the entity is, one changes its
@@ -82,8 +87,18 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class StatureCommands {
 
+    private static final Logger LOG = LoggerFactory.getLogger("stature");
+
     /** Ten minutes is far longer than any transition worth watching, and keeps a typo bounded. */
     private static final int MAX_TICKS = 20 * 60;
+
+    /** The dangerous envelope (plan Q9), narrowed from the old 0.0001..10000. */
+    private static final double DANGEROUS_MIN = 0.001;
+
+    private static final double DANGEROUS_MAX = 1000.0;
+
+    /** Above this, dangerous mode is legal but the operator is warned. */
+    private static final double DANGEROUS_WARN = 256.0;
 
     private StatureCommands() {
     }
@@ -94,6 +109,7 @@ public final class StatureCommands {
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         setBranch(root);
+        resetBranch(root);
         sizeBranch(root);
         frameBranch(root);
         channelBranch(root);
@@ -112,25 +128,33 @@ public final class StatureCommands {
     private static void setBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
         RequiredArgumentBuilder<CommandSourceStack, ?> targets =
                 Commands.argument("targets", EntityArgument.entities());
+        // The argument accepts the wide range in both shapes. The plain execution rejects a
+        // number outside the normal envelope with a message that names --dangerous; the suffix
+        // and prefix forms call the dangerous path. A safe value is unchanged.
         targets.then(scaleChain(false));
+        // The prefix form stays because the README documents it: set @s --dangerous 100.
         targets.then(Commands.literal("--dangerous").then(scaleChain(true)));
 
         root.then(Commands.literal("set").then(targets));
     }
 
     /**
-     * The scale chain, twice: once inside the attribute envelope, once outside it. Beyond
-     * the envelope the attribute holds its nearest bound and the model channel shows the
-     * rest, so a 100x looks 100x with a 16x box rather than freezing physics.
+     * The scale chain, twice: the postfix shape and the old prefix shape. Beyond the envelope
+     * the attribute holds its nearest bound and the model channel shows the rest, so a 100x
+     * looks 100x with a 16x box rather than freezing physics.
      */
     private static RequiredArgumentBuilder<CommandSourceStack, Double> scaleChain(boolean dangerous) {
         RequiredArgumentBuilder<CommandSourceStack, Double> scale = Commands.argument("scale",
-                        dangerous ? DoubleArgumentType.doubleArg(0.0001, 10000.0)
-                                : DoubleArgumentType.doubleArg(ScaleLimits.MIN, ScaleLimits.MAX))
+                        DoubleArgumentType.doubleArg(DANGEROUS_MIN, DANGEROUS_MAX))
                 // No ticks means now, and "now" is linear because there is no curve to walk:
                 // the eased default only means something once a duration exists.
-                .executes(context -> dangerous ? setDangerous(context, 0, Easing.LINEAR)
+                .executes(context -> dangerous
+                        ? setDangerous(context, 0, Easing.LINEAR)
                         : set(context, 0, Easing.LINEAR));
+        if (!dangerous) {
+            scale.then(Commands.literal("--dangerous")
+                    .executes(context -> setDangerous(context, 0, Easing.LINEAR)));
+        }
 
         RequiredArgumentBuilder<CommandSourceStack, Integer> ticks =
                 Commands.argument("ticks", IntegerArgumentType.integer(0, MAX_TICKS))
@@ -139,11 +163,27 @@ public final class StatureCommands {
                                         Easing.EASE_OUT_CUBIC)
                                 : set(context, IntegerArgumentType.getInteger(context, "ticks"),
                                         Easing.EASE_OUT_CUBIC));
+        if (!dangerous) {
+            ticks.then(Commands.literal("--dangerous")
+                    .executes(context -> setDangerous(context,
+                            IntegerArgumentType.getInteger(context, "ticks"),
+                            Easing.EASE_OUT_CUBIC)));
+        }
         ticks.then(easing("linear", Easing.LINEAR, dangerous));
         ticks.then(easing("cubic", Easing.EASE_OUT_CUBIC, dangerous));
         ticks.then(easing("elastic", Easing.ELASTIC, dangerous));
         scale.then(ticks);
         return scale;
+    }
+
+    /**
+     * One command that means "forget everything Stature did to this entity": scale, shape,
+     * frame, channels and parts. Separate from {@code frame clear}, which only forgets a frame.
+     */
+    private static void resetBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
+        root.then(Commands.literal("reset")
+                .then(Commands.argument("targets", EntityArgument.entities())
+                        .executes(StatureCommands::reset)));
     }
 
     private static void sizeBranch(LiteralArgumentBuilder<CommandSourceStack> root) {
@@ -253,22 +293,41 @@ public final class StatureCommands {
      * of curves, so tab-completion offers them, a typo is refused by Brigadier with the alternatives,
      * and adding a curve to {@link Easing} without adding it here is visible rather than silent.
      */
-    private static LiteralArgumentBuilder<CommandSourceStack> easing(String name, Easing easing, boolean dangerous) {
-        return Commands.literal(name)
+    private static LiteralArgumentBuilder<CommandSourceStack> easing(
+            String name, Easing easing, boolean dangerous) {
+        LiteralArgumentBuilder<CommandSourceStack> literal = Commands.literal(name)
                 .executes(context -> dangerous
                         ? setDangerous(context, IntegerArgumentType.getInteger(context, "ticks"), easing)
                         : set(context, IntegerArgumentType.getInteger(context, "ticks"), easing));
+        if (!dangerous) {
+            literal.then(Commands.literal("--dangerous")
+                    .executes(context -> setDangerous(context,
+                            IntegerArgumentType.getInteger(context, "ticks"), easing)));
+        }
+        return literal;
     }
 
     private static int set(CommandContext<CommandSourceStack> context, int ticks, Easing easing)
             throws CommandSyntaxException {
         Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
         float scale = (float) DoubleArgumentType.getDouble(context, "scale");
+        if (!Float.isFinite(scale)) {
+            context.getSource().sendFailure(
+                    Component.translatable("stature.command.set.badvalue"));
+            return 0;
+        }
+        if (scale < ScaleLimits.MIN || scale > ScaleLimits.MAX) {
+            context.getSource().sendFailure(Component.translatable(
+                    "stature.command.set.out_of_range",
+                    number(scale), number(ScaleLimits.MIN), number(ScaleLimits.MAX)));
+            return 0;
+        }
 
         int changed = 0;
         for (LivingEntity living : living(targets)) {
             // The shape is kept: "make it twice as big" must not silently make it square again.
             FrameService.setManualScale(living, scale, ticks, easing);
+            clearDangerousModel(living);
             changed++;
             context.getSource().sendSuccess(
                     () -> Component.translatable(
@@ -280,19 +339,29 @@ public final class StatureCommands {
 
     /**
      * Sets past the envelope: the attribute holds its nearest bound and the model channel
-     * shows the rest. The override stays until reset, so a later plain set keeps the look
-     * until {@code channel ... model reset} clears it.
+     * shows the rest. The override stays until a plain set or a reset clears it, and the
+     * entity is flagged so that plain set knows the model was the dangerous command's.
      */
     private static int setDangerous(CommandContext<CommandSourceStack> context, int ticks, Easing easing)
             throws CommandSyntaxException {
         Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
         float scale = (float) DoubleArgumentType.getDouble(context, "scale");
+        if (!Float.isFinite(scale)) {
+            context.getSource().sendFailure(
+                    Component.translatable("stature.command.set.badvalue"));
+            return 0;
+        }
         float clamped = ScaleLimits.clamp(scale);
+        if (scale > DANGEROUS_WARN) {
+            LOG.warn("dangerous scale {} is far outside the attribute envelope; the box holds {}x "
+                    + "and only the model shows the rest", scale, clamped);
+        }
 
         int changed = 0;
         for (LivingEntity living : living(targets)) {
             FrameService.setManualScale(living, clamped, ticks, easing);
             ChannelService.setChannel(living, ChannelService.MODEL, scale, ticks, easing);
+            ((StatureScale) living).stature$setDangerousModel(true);
             changed++;
             context.getSource().sendSuccess(
                     () -> Component.translatable(
@@ -301,6 +370,37 @@ public final class StatureCommands {
                     true);
         }
         return report(context, changed);
+    }
+
+    /** Forgets every part of Stature's state on these entities. */
+    private static int reset(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        Collection<? extends Entity> targets = EntityArgument.getEntities(context, "targets");
+
+        int changed = 0;
+        for (LivingEntity living : living(targets)) {
+            FrameService.clear(living);
+            ChannelService.clearAll(living);
+            ((StatureScale) living).stature$setDangerousModel(false);
+            changed++;
+            context.getSource().sendSuccess(
+                    () -> Component.translatable(
+                            "stature.command.reset.success", living.getDisplayName()),
+                    true);
+        }
+        return report(context, changed);
+    }
+
+    /**
+     * Drops a dangerous set's model channel, but only when it was the dangerous set that wrote
+     * it. A model chosen by hand survives a plain size change.
+     */
+    private static void clearDangerousModel(LivingEntity living) {
+        StatureScale duck = (StatureScale) living;
+        if (!duck.stature$dangerousModel()) {
+            return;
+        }
+        ChannelService.resetChannel(living, ChannelService.MODEL);
+        duck.stature$setDangerousModel(false);
     }
 
     private static int shape(CommandContext<CommandSourceStack> context, int ticks) throws CommandSyntaxException {

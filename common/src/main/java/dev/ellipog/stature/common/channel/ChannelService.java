@@ -122,6 +122,12 @@ public final class ChannelService {
         }
 
         StatureScale duck = (StatureScale) entity;
+        if (MODEL.equals(id)) {
+            // A hand-set model is no longer the dangerous set's leftover, so a later plain
+            // /stature set must preserve it. The dangerous command sets the flag back to true
+            // after this call.
+            duck.stature$setDangerousModel(false);
+        }
         float from = resolvedValue(entity, spec);
         duck.stature$channelOverrides().put(id, value);
         if (ticks <= 0) {
@@ -147,10 +153,34 @@ public final class ChannelService {
         require(id);
 
         StatureScale duck = (StatureScale) entity;
+        if (MODEL.equals(id)) {
+            duck.stature$setDangerousModel(false);
+        }
         duck.stature$channelOverrides().remove(id);
         duck.stature$channelTransitions().remove(id);
         applyAttributes(entity);
         StatureNetworking.broadcast(entity, syncMap(entity));
+    }
+
+    /**
+     * Drops every channel override and every in-flight channel change on this entity.
+     *
+     * <p>Used by {@code /stature reset}. One packet leaves with the empty map, because a receiver
+     * replaces its whole map rather than merging: an empty send is how "none left" travels, the
+     * same contract {@link #resetChannel} follows.
+     */
+    public static void clearAll(LivingEntity entity) {
+        requireServer(entity);
+        StatureScale duck = (StatureScale) entity;
+        boolean hadAny = !duck.stature$channelOverrides().isEmpty()
+                || !duck.stature$channelTransitions().isEmpty();
+        duck.stature$channelOverrides().clear();
+        duck.stature$channelTransitions().clear();
+        duck.stature$setDangerousModel(false);
+        applyAttributes(entity);
+        if (hadAny) {
+            StatureNetworking.broadcast(entity, Map.of());
+        }
     }
 
     /**

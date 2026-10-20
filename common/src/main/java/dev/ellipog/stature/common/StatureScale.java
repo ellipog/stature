@@ -121,6 +121,27 @@ public interface StatureScale {
     void stature$setFirstPersonVanilla(boolean vanilla);
 
     /**
+     * Whether this entity's {@code stature:model} channel was written by a dangerous set.
+     *
+     * <p>Saved with the entity. A plain {@code /stature set} clears the model only when this is
+     * true, so a model somebody chose by hand survives a later size change. A dangerous set marks
+     * it; a hand channel write clears it.
+     */
+    boolean stature$dangerousModel();
+
+    void stature$setDangerousModel(boolean dangerousModel);
+
+    /**
+     * Whether this transition has already paid its one displacement hit.
+     *
+     * <p>Displacement runs once, on the final box of a transition. When there is nowhere to move,
+     * the entity is hurt once for that transition rather than once per eased tick.
+     */
+    boolean stature$displacementHurt();
+
+    void stature$setDisplacementHurt(boolean hurt);
+
+    /**
      * This entity's per-frame render history, client-side only.
      *
      * <p>A fresh render state every frame means the state cannot remember the last tick, so

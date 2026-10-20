@@ -7,6 +7,12 @@ import dev.ellipog.stature.api.ScaleState;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.StatureNetworking;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -49,10 +55,20 @@ public final class ScaleService {
         ((StatureScale) entity).stature$setTarget(clamped(target), ticks, easing);
     }
 
-    /** The size the entity is at, from the game's own attribute and the shape on the entity. */
+    /**
+     * The size the entity is at, from the base of the game's own scale attribute and the shape
+     * on the entity.
+     *
+     * <p>Stature owns the <em>base</em>, not the final value: another mod's or a potion's
+     * {@code minecraft:scale} modifier multiplies on top and is deliberately not folded into the
+     * number Stature reads back. Reading the final value and writing it into the base is how a
+     * read-modify-write compounds somebody else's modifier into the entity a little more on every
+     * apply (the plan's §3.2-K drift). A base written outside the attribute's envelope is clamped
+     * for the same reason every other scale is.
+     */
     public static ScaleState stateOf(LivingEntity entity) {
         AttributeInstance instance = entity.getAttribute(Attributes.SCALE);
-        float scale = instance == null ? 1.0F : (float) instance.getValue();
+        float scale = instance == null ? 1.0F : (float) instance.getBaseValue();
         return new ScaleState(ScaleLimits.clamp(scale), ((StatureScale) entity).stature$axes());
     }
 
@@ -65,6 +81,18 @@ public final class ScaleService {
      * a player would notice.
      */
     public static void apply(LivingEntity entity, ScaleState state) {
+        apply(entity, state, true);
+    }
+
+    /**
+     * Writes a size onto the entity, optionally settling the box.
+     *
+     * <p>{@code finalTarget} is false for the intermediate ticks of an ease and true for an instant
+     * set or the last tick. Displacement runs only on the final box: the eased path is the bulk of
+     * the cost, and a search on every intermediate box would also move an entity through shapes
+     * nobody asked for.
+     */
+    public static void apply(LivingEntity entity, ScaleState state, boolean finalTarget) {
         float scale = state.scale();
 
         // Only the uniform rides a base write. Reach, step and the rest of the attribute
@@ -80,7 +108,7 @@ public final class ScaleService {
         duck.stature$setAxes(state.axes());
         entity.refreshDimensions();
 
-        if (!entity.level().isClientSide()) {
+        if (finalTarget && !entity.level().isClientSide()) {
             displace(entity, oldBox);
         }
 
@@ -94,12 +122,12 @@ public final class ScaleService {
     /**
      * Pushes a grown entity out of solid rock, or hurts it when there is nowhere to go.
      *
-     * <p>Runs after every server-side size write, but only when the box grew: a smaller box
-     * cannot newly intersect anything. Escape tries up first, then out the sides; each
-     * candidate is the whole box moved, so the entity lands fully in air or not at all.
-     * Failure hurts a little, every time, because applies repeat during eases: a tap for an
-     * instant set, a real crushing for a full ease spent encased. Vanilla suffocation picks
-     * up whatever remains.
+     * <p>Runs after the final server-side size write, and only when the box grew: a smaller box
+     * cannot newly intersect anything. Escape searches outward in growing shells, up first, with a
+     * hard cap of {@value #MAX_DISPLACEMENT_CANDIDATES} whole-box positions. Each candidate is the
+     * complete box moved, so the entity lands fully in air or not at all. A transition that ends
+     * with nowhere to go hurts once, not once per eased tick; vanilla suffocation picks up whatever
+     * remains.
      */
     private static void displace(LivingEntity entity, AABB oldBox) {
         AABB box = entity.getBoundingBox();
@@ -107,32 +135,87 @@ public final class ScaleService {
             return;
         }
         Level level = entity.level();
-        if (!level.getBlockCollisions(entity, box).iterator().hasNext()) {
+        if (level.noCollision(entity, box)) {
             return;
         }
 
-        double[] up = {1.0, 2.0, 3.0};
-        double[] out = {1.0, 2.0};
-        double[][] sides = {{1.0, 0.0}, {-1.0, 0.0}, {0.0, 1.0}, {0.0, -1.0}};
-        for (double dy : up) {
-            if (moveIfFree(entity, level, box, 0.0, dy, 0.0)) {
+        for (Offset offset : candidateOffsets(box)) {
+            if (moveIfFree(entity, level, box, offset.x(), offset.y(), offset.z())) {
                 return;
             }
         }
-        for (double r : out) {
-            for (double[] side : sides) {
-                if (moveIfFree(entity, level, box, side[0] * r, 0.0, side[1] * r)) {
-                    return;
-                }
-            }
+
+        StatureScale duck = (StatureScale) entity;
+        if (duck.stature$displacementHurt()) {
+            return;
         }
-        entity.hurtOrSimulate(level.damageSources().inWall(), 1.0F);
+        duck.stature$setDisplacementHurt(true);
+        if (level instanceof ServerLevel serverLevel) {
+            entity.hurtOrSimulate(StatureDamageTypes.compression(serverLevel), 2.0F);
+        }
+    }
+
+    /** One whole-box displacement, in blocks. */
+    record Offset(int x, int y, int z) {
+    }
+
+    /** At most this many candidate boxes are collision-tested per settled transition. */
+    static final int MAX_DISPLACEMENT_CANDIDATES = 64;
+
+    /**
+     * The whole-box offsets to try, in search order: up first, then shells growing by one block.
+     *
+     * <p>A sparse shell rather than every integer triple: a dense shell at 16x has tens of
+     * thousands of points and the useful escapes are the six faces, the horizontal diagonals and
+     * the vertical diagonals. Within each shell the six face directions come first, then the
+     * diagonals, which is the "prefer up, then the nearest shell" order the plan asks for.
+     */
+    static List<Offset> candidateOffsets(AABB box) {
+        int radius = (int) Math.ceil(Math.max(box.getXsize(), Math.max(box.getYsize(), box.getZsize())));
+        radius = Math.max(1, Math.min(48, radius));
+
+        Set<Offset> offsets = new LinkedHashSet<>();
+        for (int up = 1; up <= Math.min(4, radius) && offsets.size() < MAX_DISPLACEMENT_CANDIDATES; up++) {
+            offsets.add(new Offset(0, up, 0));
+        }
+        for (int r = 1; r <= radius && offsets.size() < MAX_DISPLACEMENT_CANDIDATES; r++) {
+            add(offsets, 0, r, 0);
+            add(offsets, 0, -r, 0);
+            add(offsets, r, 0, 0);
+            add(offsets, -r, 0, 0);
+            add(offsets, 0, 0, r);
+            add(offsets, 0, 0, -r);
+            add(offsets, r, 0, r);
+            add(offsets, r, 0, -r);
+            add(offsets, -r, 0, r);
+            add(offsets, -r, 0, -r);
+        }
+        // Vertical diagonals only when the face and horizontal shell budget left room: they are
+        // the least likely escape and would otherwise eat the radius a tunnel needs.
+        for (int r = 1; r <= radius && offsets.size() < MAX_DISPLACEMENT_CANDIDATES; r++) {
+            add(offsets, r, r, 0);
+            add(offsets, -r, r, 0);
+            add(offsets, 0, r, r);
+            add(offsets, 0, r, -r);
+            add(offsets, r, -r, 0);
+            add(offsets, -r, -r, 0);
+            add(offsets, 0, -r, r);
+            add(offsets, 0, -r, -r);
+        }
+        return new ArrayList<>(offsets);
+    }
+
+    private static void add(Set<Offset> offsets, int x, int y, int z) {
+        if (offsets.size() >= MAX_DISPLACEMENT_CANDIDATES) {
+            return;
+        }
+        offsets.add(new Offset(x, y, z));
     }
 
     private static boolean moveIfFree(
             LivingEntity entity, Level level, AABB box, double dx, double dy, double dz) {
         AABB moved = box.move(dx, dy, dz);
-        if (level.getBlockCollisions(entity, moved).iterator().hasNext()) {
+        if (!level.noCollision(entity, moved)) {
             return false;
         }
         entity.teleportTo((moved.minX + moved.maxX) / 2.0, moved.minY, (moved.minZ + moved.maxZ) / 2.0);

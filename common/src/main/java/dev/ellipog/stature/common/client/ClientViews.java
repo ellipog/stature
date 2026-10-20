@@ -21,4 +21,14 @@ public final class ClientViews {
         Entity camera = Minecraft.getInstance().getCameraEntity();
         return camera == null ? null : camera.position();
     }
+
+    /**
+     * The vanilla Screen Effect accessibility slider, 0 to 1.
+     *
+     * <p>Read at the client call site so {@code CameraTrauma} never names a client class. The
+     * option lives on the client's own options object, not on the server.
+     */
+    public static float screenEffectScale() {
+        return Minecraft.getInstance().options.screenEffectScale().get().floatValue();
+    }
 }

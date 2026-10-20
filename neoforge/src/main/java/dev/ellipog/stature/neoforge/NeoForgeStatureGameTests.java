@@ -24,7 +24,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * NeoForge's half of the shared gametest bodies (improvement plan M4).
  *
- * <p>The same five bodies Fabric runs, registered as
+ * <p>The same bodies Fabric runs, registered as
  * {@code FunctionGameTestInstance}s on the mod bus's
  * {@link RegisterGameTestsEvent}. Registration is gated behind
  * {@code -Dstature.gametest=true}, which only the {@code gameTestServer} run
@@ -32,9 +32,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  * recommendation) but never registers them in a player's world.
  *
  * <p>There is no shipped arena structure yet: every test uses
- * {@code minecraft:empty} with padding and spawns into open air, which is
- * all the current bodies need. A 32x24x32 floor comes with the M5 tests that
- * need somewhere to stand.
+ * {@code minecraft:empty} with padding and builds its own floor in code,
+ * which all the current bodies need. The padding is wide enough for the
+ * 13x13 leaf field and the tunnel the M5 tests build.
  */
 public final class NeoForgeStatureGameTests {
 
@@ -42,7 +42,7 @@ public final class NeoForgeStatureGameTests {
     private record TestCase(String name, Consumer<GameTestHelper> body) {
     }
 
-    /** The five shared bodies, in registration order. */
+    /** The shared bodies, in registration order. */
     private static final List<TestCase> TESTS = List.of(
             new TestCase("parts_only_survive_save", StatureGameTests::partsOnlySurviveSave),
             new TestCase("scale_defaults_leave_physics_vanilla",
@@ -50,7 +50,15 @@ public final class NeoForgeStatureGameTests {
             new TestCase("eye_inside_box_for_every_pose", StatureGameTests::eyeInsideBoxForEveryPose),
             new TestCase("framed_thresholds_resolved_per_entity",
                     StatureGameTests::framedThresholdsResolvedPerEntity),
-            new TestCase("uniform_scale_survives_save", StatureGameTests::uniformScaleSurvivesSave));
+            new TestCase("uniform_scale_survives_save", StatureGameTests::uniformScaleSurvivesSave),
+            new TestCase("trample_respects_mob_griefing", StatureGameTests::trampleRespectsMobGriefing),
+            new TestCase("trample_capped_per_scan", StatureGameTests::trampleCappedPerScan),
+            new TestCase("grow_in_tunnel_ends_in_air", StatureGameTests::growInTunnelEndsInAir),
+            new TestCase("dangerous_model_reset_on_plain_set",
+                    StatureGameTests::dangerousModelResetOnPlainSet),
+            new TestCase("reset_clears_everything", StatureGameTests::resetClearsEverything),
+            new TestCase("foreign_scale_modifier_no_drift",
+                    StatureGameTests::foreignScaleModifierNoDrift));
 
     private static final DeferredRegister<Consumer<GameTestHelper>> FUNCTIONS =
             DeferredRegister.create(Registries.TEST_FUNCTION, Stature.MOD_ID);
@@ -85,7 +93,7 @@ public final class NeoForgeStatureGameTests {
                         environment,
                         Level.OVERWORLD,
                         Identifier.fromNamespaceAndPath("minecraft", "empty"),
-                        100, 0, true, Rotation.NONE, false, 1, 1, false, 5)));
+                        100, 0, true, Rotation.NONE, false, 1, 1, false, 16)));
             }
         });
     }

@@ -90,6 +90,12 @@ public abstract class LivingEntityMixin implements StatureScale {
     private boolean stature$firstPersonVanilla;
 
     @Unique
+    private boolean stature$dangerousModel;
+
+    @Unique
+    private boolean stature$displacementHurt;
+
+    @Unique
     private HitRegion stature$incomingRegion;
 
     @Unique
@@ -201,6 +207,26 @@ public abstract class LivingEntityMixin implements StatureScale {
     }
 
     @Override
+    public boolean stature$dangerousModel() {
+        return this.stature$dangerousModel;
+    }
+
+    @Override
+    public void stature$setDangerousModel(boolean dangerousModel) {
+        this.stature$dangerousModel = dangerousModel;
+    }
+
+    @Override
+    public boolean stature$displacementHurt() {
+        return this.stature$displacementHurt;
+    }
+
+    @Override
+    public void stature$setDisplacementHurt(boolean hurt) {
+        this.stature$displacementHurt = hurt;
+    }
+
+    @Override
     public HitRegion stature$incomingRegion() {
         return this.stature$incomingRegion;
     }
@@ -251,6 +277,7 @@ public abstract class LivingEntityMixin implements StatureScale {
     @Override
     public void stature$setTarget(ScaleState target, int ticks, Easing easing) {
         LivingEntity self = (LivingEntity) (Object) this;
+        this.stature$displacementHurt = false;
         this.stature$transition = ScaleTransition.between(
                 ScaleService.stateOf(self), ScaleService.clamped(target), ticks, easing);
 
@@ -281,7 +308,10 @@ public abstract class LivingEntityMixin implements StatureScale {
         if (this.stature$transition == null || this.stature$transition.isDone()) {
             return;
         }
-        ScaleService.apply(self, this.stature$transition.advance());
+        // Displacement is paid only once the target box is reached: during an ease the box
+        // passes through shapes nobody asked for, and searching for a way out on every one of
+        // them is both the bulk of the cost and a jitter the player would see.
+        ScaleService.apply(self, this.stature$transition.advance(), this.stature$transition.isDone());
     }
 
     /**

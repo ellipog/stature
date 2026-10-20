@@ -47,8 +47,38 @@ public final class StatureFabricGameTests {
         StatureGameTests.framedThresholdsResolvedPerEntity(helper);
     }
 
-    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 5)
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
     public void uniformScaleSurvivesSave(GameTestHelper helper) {
         StatureGameTests.uniformScaleSurvivesSave(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void trampleRespectsMobGriefing(GameTestHelper helper) {
+        StatureGameTests.trampleRespectsMobGriefing(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void trampleCappedPerScan(GameTestHelper helper) {
+        StatureGameTests.trampleCappedPerScan(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void growInTunnelEndsInAir(GameTestHelper helper) {
+        StatureGameTests.growInTunnelEndsInAir(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void dangerousModelResetOnPlainSet(GameTestHelper helper) {
+        StatureGameTests.dangerousModelResetOnPlainSet(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void resetClearsEverything(GameTestHelper helper) {
+        StatureGameTests.resetClearsEverything(helper);
+    }
+
+    @GameTest(structure = "fabric-gametest-api-v1:empty", maxTicks = 100, padding = 16)
+    public void foreignScaleModifierNoDrift(GameTestHelper helper) {
+        StatureGameTests.foreignScaleModifierNoDrift(helper);
     }
 }

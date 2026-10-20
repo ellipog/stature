@@ -1,6 +1,9 @@
 {
     "stature.command.set.success": "Set %s to %sx",
     "stature.command.set.dangerous": "Set %s to %sx past the envelope: box holds %sx, model shows the rest",
+    "stature.command.set.out_of_range": "%s is outside the normal %s..%s range; add --dangerous to go past it",
+    "stature.command.set.badvalue": "Scale must be a finite number",
+    "stature.command.reset.success": "Reset %s to vanilla",
     "stature.handshake.required": "This server requires the Stature mod",
     "stature.command.size.success": "Shaped %s to %s x %s x %s",
     "stature.command.set.none": "No living entities matched",
@@ -27,5 +30,6 @@
     "stature.command.part.unknown": "No part or group named %s on that rig (raw dot paths type blind)",
     "stature.command.part.badvalue": "Part factors must be positive finite numbers",
     "stature.command.part.list": "%s parts: %s",
-    "stature.command.part.list.empty": "%s has no part factors"
+    "stature.command.part.list.empty": "%s has no part factors",
+    "death.attack.compression": "%1$s was crushed by their own size"
 }

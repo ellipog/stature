@@ -90,7 +90,8 @@ public final class StatureFabricClient implements ClientModInitializer {
                 context.client().execute(() -> {
                     Vec3 camera = ClientViews.cameraPosition();
                     if (camera != null) {
-                        CameraTrauma.addShake(payload.x(), payload.y(), payload.z(), payload.scale(), camera);
+                        CameraTrauma.addShake(payload.x(), payload.y(), payload.z(),
+                                payload.scale(), camera, ClientViews.screenEffectScale());
                     }
                 }));
         ClientPlayNetworking.registerGlobalReceiver(HandshakePayload.TYPE, (payload, context) ->

@@ -65,6 +65,10 @@ public final class StatureConfig {
 
     private static float macroThreshold = 2.5F;
 
+    private static int trampleMaxPerScan = 8;
+
+    private static boolean trampleDrops = true;
+
     private static final Map<String, Boolean> FLAGS = new LinkedHashMap<>(Map.of(
             POROUS_TRAVERSAL, true,
             SURFACE_CLIMBING, true,
@@ -93,17 +97,47 @@ public final class StatureConfig {
         }
     }
 
-    /** Applies values received from the server. Client-side only. */
-    public static synchronized void applySynced(float micro, float macro, Map<String, Boolean> flags) {
-        if (micro > 0.0F && macro > micro) {
-            microThreshold = micro;
-            macroThreshold = macro;
+    /**
+     * Applies values received from the server. Client-side only.
+     *
+     * <p>The whole packet is validated before anything is written: a packet with one bad edge or
+     * one unknown flag is rejected and the previous values stay. Half-applying a packet is how a
+     * client ends up gating climbing on one edge and breaking on another.
+     *
+     * @return true when the packet was applied, false when it was rejected
+     */
+    public static synchronized boolean applySynced(
+            float micro, float macro, Map<String, Boolean> flags) {
+        if (!Float.isFinite(micro) || !Float.isFinite(macro) || !(micro > 0.0F) || !(macro > micro)) {
+            LOG.warn("rejecting synced config: edges must satisfy 0 < micro < macro, got {} and {}",
+                    micro, macro);
+            return false;
+        }
+        if (flags == null) {
+            LOG.warn("rejecting synced config: no flag map");
+            return false;
         }
         for (Map.Entry<String, Boolean> entry : flags.entrySet()) {
-            if (FLAGS.containsKey(entry.getKey())) {
-                FLAGS.put(entry.getKey(), entry.getValue());
+            if (entry.getKey() == null || entry.getValue() == null
+                    || !FLAGS.containsKey(entry.getKey())) {
+                LOG.warn("rejecting synced config: unknown threshold flag \"{}\"", entry.getKey());
+                return false;
             }
         }
+        microThreshold = micro;
+        macroThreshold = macro;
+        FLAGS.putAll(flags);
+        return true;
+    }
+
+    /** How many fragile blocks one trample scan may destroy. */
+    public static synchronized int trampleMaxPerScan() {
+        return trampleMaxPerScan;
+    }
+
+    /** Whether trampled blocks drop their items. */
+    public static synchronized boolean trampleDrops() {
+        return trampleDrops;
     }
 
     /** A snapshot for packets: micro, macro, then the flags. */
@@ -349,7 +383,37 @@ public final class StatureConfig {
         }
         for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
             String key = entry.getKey();
-            if (key.equals("micro_threshold") || key.equals("macro_threshold")) {
+            if (key.equals("micro_threshold") || key.equals("macro_threshold")
+                    || key.equals("comment")) {
+                // "comment" is the one key earlier versions wrote into their own default file.
+                // It is accepted and ignored rather than reported, so an existing config does
+                // not log an unknown-key line on every start.
+                continue;
+            }
+            if (key.equals("trample_max_per_scan")) {
+                if (entry.getValue().isJsonPrimitive()
+                        && entry.getValue().getAsJsonPrimitive().isNumber()) {
+                    double raw = entry.getValue().getAsDouble();
+                    if (raw >= 1.0 && raw == Math.rint(raw) && raw <= Integer.MAX_VALUE) {
+                        trampleMaxPerScan = (int) raw;
+                    } else {
+                        LOG.warn("config {} needs a whole trample_max_per_scan >= 1; keeping {}",
+                                source, trampleMaxPerScan);
+                    }
+                } else {
+                    LOG.warn("config {} trample_max_per_scan must be a whole number; keeping {}",
+                            source, trampleMaxPerScan);
+                }
+                continue;
+            }
+            if (key.equals("trample_drops")) {
+                if (entry.getValue().isJsonPrimitive()
+                        && entry.getValue().getAsJsonPrimitive().isBoolean()) {
+                    trampleDrops = entry.getValue().getAsBoolean();
+                } else {
+                    LOG.warn("config {} trample_drops must be true or false; keeping {}",
+                            source, trampleDrops);
+                }
                 continue;
             }
             if (!FLAGS.containsKey(key)) {
@@ -379,13 +443,14 @@ public final class StatureConfig {
             try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
                 writer.write("""
                         {
-                          "comment": "Tier edges and mechanic toggles. A frame may override any of these per entity.",
                           "micro_threshold": 0.25,
                           "macro_threshold": 2.5,
                           "porous_traversal": true,
                           "surface_climbing": true,
                           "amplified_knockback": true,
                           "trampling": true,
+                          "trample_max_per_scan": 8,
+                          "trample_drops": true,
                           "seismic_footsteps": true,
                           "doorway_collision": true
                         }
