@@ -13,6 +13,7 @@ import java.util.Map;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -53,6 +54,13 @@ public final class StaturePackets {
                 AxesPayload.STREAM_CODEC,
                 ArmatureNetwork.Direction.TO_CLIENT,
                 payload -> StatureClientHandlers.axes(payload),
+                null));
+
+        ArmatureNetwork.register(new ArmatureNetwork.Registration<>(
+                ProjectileScalePayload.TYPE,
+                ProjectileScalePayload.STREAM_CODEC,
+                ArmatureNetwork.Direction.TO_CLIENT,
+                payload -> StatureClientHandlers.projectileScale(payload),
                 null));
 
         ArmatureNetwork.register(new ArmatureNetwork.Registration<>(
@@ -104,6 +112,35 @@ public final class StaturePackets {
 
     public static void sendTo(ServerPlayer player, LivingEntity entity, ScaleState state) {
         ArmatureNetwork.sendToPlayer(player, payload(entity, state));
+    }
+
+    /**
+     * Sends a projectile's inherited factor to everyone tracking it.
+     *
+     * <p>Called when the owner is learned or a saved factor is restored. Before the projectile is
+     * added there are no trackers, so this is usually a no-op on the spawn path; the tracking hook
+     * is the send that matters there. It matters on its own when the owner is learned after the
+     * projectile was already visible.
+     */
+    public static void broadcastProjectileScale(Projectile projectile, float factor) {
+        // Owner is usually learned in the projectile's constructor, before the level knows it.
+        // Sending then would ask "who tracks this?" about an entity with no id and no trackers.
+        if (projectile.level().getEntity(projectile.getId()) != projectile) {
+            return;
+        }
+        ArmatureNetwork.sendToTracking(
+                projectile, new ProjectileScalePayload(projectile.getId(), factor));
+    }
+
+    /**
+     * Sends a projectile's factor to one player, for a viewer who has just started tracking it.
+     *
+     * <p>The player is the one the loader's tracking event named, so its connection exists. That
+     * is deliberately different from the load-time player path, which must wait for the connection
+     * rather than send through a null one.
+     */
+    public static void sendProjectileScaleTo(ServerPlayer player, Projectile projectile, float factor) {
+        ArmatureNetwork.sendToPlayer(player, new ProjectileScalePayload(projectile.getId(), factor));
     }
 
     public static void broadcast(LivingEntity entity, Map<String, Float> channels) {

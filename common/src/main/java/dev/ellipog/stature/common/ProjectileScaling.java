@@ -1,6 +1,7 @@
 package dev.ellipog.stature.common;
 
 import dev.ellipog.stature.common.channel.ChannelTuning;
+import dev.ellipog.stature.common.net.StaturePackets;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -39,13 +40,20 @@ public final class ProjectileScaling {
         float factor = ChannelTuning.factor(owner, StatureConfig.PROJECTILE_SCALE_CHANNEL);
         duck.stature$setProjectileScale(factor);
         projectile.refreshDimensions();
-        applySpeed(projectile, duck);
+        if (!projectile.level().isClientSide()) {
+            // The spawn packet's velocity is already the scaled one, so multiplying it again here
+            // would give the client a different flight from the server's. The size, on the other
+            // hand, is needed on both sides immediately; the explicit sync below corrects a client
+            // that could not derive it.
+            applySpeed(projectile, duck);
+            StaturePackets.broadcastProjectileScale(projectile, factor);
+        }
     }
 
     /** Called after {@code Projectile.shoot}, where the initial movement is finally known. */
     public static void shot(Projectile projectile) {
         StatureProjectile duck = (StatureProjectile) projectile;
-        if (duck.stature$projectileScaled()) {
+        if (!projectile.level().isClientSide() && duck.stature$projectileScaled()) {
             applySpeed(projectile, duck);
         }
     }
@@ -77,6 +85,12 @@ public final class ProjectileScaling {
             duck.stature$markProjectileSpeedApplied();
         }
         projectile.refreshDimensions();
+        if (!projectile.level().isClientSide()) {
+            // A chunk load usually happens before tracking, so this often reaches nobody. It is
+            // still the correct send for a projectile restored into a level that already has
+            // viewers, and it costs one call on the load path.
+            StaturePackets.broadcastProjectileScale(projectile, saved);
+        }
     }
 
     /**

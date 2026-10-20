@@ -4,6 +4,7 @@ import dev.ellipog.armature.api.net.ArmatureNetwork;
 import dev.ellipog.stature.common.ResolvedThresholds;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.StatureProjectile;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.net.AxesPayload;
@@ -12,10 +13,12 @@ import dev.ellipog.stature.common.net.ConfigPayload;
 import dev.ellipog.stature.common.net.FootstepPayload;
 import dev.ellipog.stature.common.net.HandshakePayload;
 import dev.ellipog.stature.common.net.PartsPayload;
+import dev.ellipog.stature.common.net.ProjectileScalePayload;
 import dev.ellipog.stature.common.net.ThresholdsPayload;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -41,6 +44,22 @@ public final class StatureClientHandlers {
         Entity entity = ClientViews.entity(payload.entityId());
         if (entity instanceof LivingEntity living) {
             ScaleService.applyFromServer(living, payload.state(), payload.eyeHeight());
+        }
+    }
+
+    /**
+     * Puts the server's snapshot on a projectile the client may have derived differently.
+     *
+     * <p>The spawn path already lets the client guess from its copy of the owner. That guess is
+     * unavailable when the owner is not loaded, and stale when the owner has changed size since
+     * the shot, so this message is authoritative rather than supplementary. The dimension refresh
+     * is what makes the client's box match the new factor in the same frame.
+     */
+    public static void projectileScale(ProjectileScalePayload payload) {
+        Entity entity = ClientViews.entity(payload.entityId());
+        if (entity instanceof Projectile projectile && entity instanceof StatureProjectile duck) {
+            duck.stature$setProjectileScale(payload.factor());
+            projectile.refreshDimensions();
         }
     }
 

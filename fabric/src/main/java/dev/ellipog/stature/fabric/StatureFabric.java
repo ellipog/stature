@@ -4,6 +4,7 @@ import dev.ellipog.armature.api.ArmatureApi;
 import dev.ellipog.armature.api.net.ArmatureNetwork;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.StatureProjectile;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -27,6 +28,7 @@ import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.minecraft.server.packs.PackType;
 
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +74,15 @@ public final class StatureFabric implements ModInitializer {
                 .registerReloadListener(StatureDataReload.ID, StatureDataReload.listener());
 
         EntityTrackingEvents.START_TRACKING.register((entity, player) -> {
+            if (entity instanceof Projectile projectile) {
+                if (projectile instanceof StatureProjectile duck && duck.stature$projectileScaled()) {
+                    // The spawn packet has been bundled already: this event is at the tail of
+                    // addPairing, so the client has the entity before the factor arrives.
+                    StaturePackets.sendProjectileScaleTo(
+                            player, projectile, duck.stature$projectileScale());
+                }
+                return;
+            }
             if (entity instanceof LivingEntity living) {
                 StaturePackets.sendTo(player, living, ScaleService.stateOf(living));
                 if (ChannelService.hasSyncedState(living)) {

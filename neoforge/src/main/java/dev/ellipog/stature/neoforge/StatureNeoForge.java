@@ -5,6 +5,7 @@ import dev.ellipog.armature.api.net.ArmatureNetwork;
 import dev.ellipog.stature.api.Stature;
 import dev.ellipog.stature.common.ScaleService;
 import dev.ellipog.stature.common.StatureConfig;
+import dev.ellipog.stature.common.StatureProjectile;
 import dev.ellipog.stature.common.StatureScale;
 import dev.ellipog.stature.common.channel.ChannelService;
 import dev.ellipog.stature.common.command.StatureCommands;
@@ -18,6 +19,7 @@ import dev.ellipog.stature.common.parts.RigRegistry;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -75,7 +77,19 @@ public final class StatureNeoForge {
 
         // A viewer who arrives after the shape was set has never been told it.
         NeoForge.EVENT_BUS.addListener((PlayerEvent.StartTracking event) -> {
-            if (event.getEntity() instanceof ServerPlayer player && event.getTarget() instanceof LivingEntity living) {
+            if (!(event.getEntity() instanceof ServerPlayer player)) {
+                return;
+            }
+            if (event.getTarget() instanceof Projectile projectile) {
+                if (projectile instanceof StatureProjectile duck && duck.stature$projectileScaled()) {
+                    // NeoForge fires this after the spawn packet, so the client already has the
+                    // entity and can apply the factor immediately.
+                    StaturePackets.sendProjectileScaleTo(
+                            player, projectile, duck.stature$projectileScale());
+                }
+                return;
+            }
+            if (event.getTarget() instanceof LivingEntity living) {
                 StaturePackets.sendTo(player, living, ScaleService.stateOf(living));
                 if (ChannelService.hasSyncedState(living)) {
                     StaturePackets.sendTo(player, living, ChannelService.syncMap(living));
