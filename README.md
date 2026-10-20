@@ -20,7 +20,7 @@ manual checklist.
 
 Put the matching Fabric or NeoForge jar in `mods/` on both the client and the server. Fabric needs
 Fabric API; NeoForge needs no companion mod. Do not install Stature beside Pehkui or Pehkui
-Rebuilt; see [compatibility](docs/compatibility.md).
+Rebuilt; see [compatibility](docs/reference/compatibility.md).
 
 ## Building
 
@@ -50,13 +50,13 @@ The manual lives in [docs/](docs/index.md), written for ellipog.dev.
 
 | Page | What it covers |
 |---|---|
-| [Commands](docs/commands.md) | Every `/stature` subcommand |
-| [Frames](docs/frames.md) | The datapack frame format and its examples |
-| [Channels](docs/channels.md) | The 48 built-in channels and override semantics |
-| [Parts and regions](docs/parts-and-regions.md) | Rigs, part factors and hurt regions |
-| [Thresholds](docs/thresholds.md) | The config file and the micro and macro mechanics |
-| [Dangerous sizes](docs/dangerous.md) | Sizes past the game's scale envelope |
-| [Compatibility](docs/compatibility.md) | Pehkui, claims, shaders and the client and server rules |
+| [Commands](docs/reference/commands.md) | Every `/stature` subcommand |
+| [Frames](docs/scaling/frames.md) | The datapack frame format and its examples |
+| [Channels](docs/scaling/channels.md) | The 48 built-in channels and override semantics |
+| [Parts and regions](docs/scaling/parts-and-regions.md) | Rigs, part factors and hurt regions |
+| [Thresholds](docs/scaling/thresholds.md) | The config file and the micro and macro mechanics |
+| [Dangerous sizes](docs/reference/dangerous.md) | Sizes past the game's scale envelope |
+| [Compatibility](docs/reference/compatibility.md) | Pehkui, claims, shaders and the client and server rules |
 | [API](docs/api/index.md) | The supported facade for another mod |
 | [API events](docs/api/events.md) | Change events and their thread and ordering guarantees |
 | [Changelog](CHANGELOG.md) | What is on `master` so far |

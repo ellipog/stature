@@ -90,7 +90,7 @@ stature.registerChannel(new ChannelSpec(
 ```
 
 The id must not already be taken. Ids outside the `stature` namespace are stored as experimental.
-The channel table is server-side state, like the built-ins. See [[stature:channels]] for the built-in
+The channel table is server-side state, like the built-ins. See [[stature:scaling/channels]] for the built-in
 set and what each channel drives.
 
 The M10 physical channels need no extra API: `projectile_scale`, `item_pickup_range`,

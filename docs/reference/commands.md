@@ -79,7 +79,7 @@ that names `--dangerous`.
 
 `--dangerous` may follow the scale, the ticks or the easing, and the prefix form puts it before the
 scale. It accepts 0.001 to 1000. Above 256 the command logs a warning. The box holds the nearest
-bound (see [[stature:dangerous]]) and the model shows the requested size.
+bound (see [[stature:reference/dangerous]]) and the model shows the requested size.
 
 ## Resetting
 
@@ -148,7 +148,7 @@ channel's own meaning decides what is sensible. A set value is an override and i
 
 `reset` drops the override, so the channel follows the scale again, or returns to exactly 1.0 for a
 channel that follows nothing. The full list of ids, defaults and effects is in
-[[stature:channels]].
+[[stature:scaling/channels]].
 
 ## Parts
 

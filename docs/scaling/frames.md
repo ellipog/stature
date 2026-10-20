@@ -177,14 +177,14 @@ the box follow the parts instead:
 
 The box becomes the largest factor on each axis, with a floor of 1.0, so factors below 1 do not
 shrink the presence box below vanilla on any axis. This is a presence box, not a per-part
-collision shape; see [[stature:parts-and-regions]].
+collision shape; see [[stature:scaling/parts-and-regions]].
 
 ## Parts, regions and thresholds in a frame
 
 `parts` maps a rig group to three multipliers. Groups resolve through the frame's `rig` when the
 frame is applied, so what travels is model paths. An unknown group is logged and skipped rather
 than failing the frame. Part factors are saved with the entity and sent to viewers; the full
-format is in [[stature:parts-and-regions]].
+format is in [[stature:scaling/parts-and-regions]].
 
 `regions` names a rig group, a non-negative damage multiplier and a tag:
 
@@ -211,7 +211,7 @@ entities:
 The edges must be positive and `micro` must be below `macro`. The boolean flag keys are the same
 mechanic flags as `config/stature.json`; an unknown flag is logged and skipped. The numeric trample
 keys are config-only and are not frame fields. The server resolves the frame over the config file
-and sends the answer to clients, so both sides agree. See [[stature:thresholds]].
+and sends the answer to clients, so both sides agree. See [[stature:scaling/thresholds]].
 
 ## Errors in the log
 

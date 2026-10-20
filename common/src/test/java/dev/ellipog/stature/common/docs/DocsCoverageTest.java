@@ -24,8 +24,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins the two tables a reader checks first (plan M7): every command literal in
- * {@code StatureCommands} is in {@code docs/commands.md}, and every built-in channel is in
- * {@code docs/channels.md}.
+ * {@code StatureCommands} is in {@code docs/reference/commands.md}, and every built-in channel is in
+ * {@code docs/scaling/channels.md}.
  *
  * <p>The command side reads the source's literal calls rather than a hand-written list. Building
  * the Brigadier tree in a unit test would bootstrap the game's registries, and these tests are
@@ -56,19 +56,19 @@ class DocsCoverageTest {
         }
         assertFalse(literals.isEmpty(), "StatureCommands declares no literals");
 
-        String commandsPage = readRepoFile("docs/commands.md");
+        String commandsPage = readRepoFile("docs/reference/commands.md");
         for (String literal : literals) {
             assertTrue(mentions(commandsPage, literal),
-                    "docs/commands.md does not mention the command literal \"" + literal + "\"");
+                    "docs/reference/commands.md does not mention the command literal \"" + literal + "\"");
         }
     }
 
     @Test
     void everyChannelIdIsDocumented() throws IOException {
-        String channels = readRepoFile("docs/channels.md");
+        String channels = readRepoFile("docs/scaling/channels.md");
         for (String id : ChannelRegistry.instance().ids()) {
             assertTrue(mentions(channels, id),
-                    "docs/channels.md does not mention the " + id + " channel");
+                    "docs/scaling/channels.md does not mention the " + id + " channel");
         }
     }
 

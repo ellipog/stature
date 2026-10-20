@@ -41,7 +41,7 @@ mod that only protects against players does not automatically protect against a 
 rules are what stop that.
 
 The trample scan is capped per scan regardless of permissions, so a claim that allows the break
-still gets at most `trample_max_per_scan` blocks per scan. See [[stature:thresholds]].
+still gets at most `trample_max_per_scan` blocks per scan. See [[stature:scaling/thresholds]].
 
 ## Rendering mods and shaders
 

@@ -91,7 +91,7 @@ overridden. The exponent is what the basis is raised to.
 
 These five channels are applied by Stature itself rather than by a vanilla attribute. They still
 use the normal override system, the normal save and sync, and the normal config gate. Their
-numeric tuning lives in [[stature:thresholds]].
+numeric tuning lives in [[stature:scaling/thresholds]].
 
 ### Projectiles
 
@@ -220,4 +220,4 @@ later choice is left alone. A channel an operator sets after the frame is just a
 
 `list` prints every channel id with its resolved value and marks overrides with `(override)`.
 A set value lands immediately; `reset` returns the channel to following the scale. The syntax is
-on [[stature:commands]].
+on [[stature:reference/commands]].

@@ -22,7 +22,7 @@ says otherwise.
 
 Do not install Stature beside Pehkui or Pehkui Rebuilt. All of them write the game's
 `minecraft:scale` attribute, and Stature expects to be the one choosing its base value. See
-[[stature:compatibility]].
+[[stature:reference/compatibility]].
 
 ## The pieces
 
@@ -41,12 +41,12 @@ Do not install Stature beside Pehkui or Pehkui Rebuilt. All of them write the ga
 
 | Page | What it is |
 |---|---|
-| [[stature:commands]] | Every `/stature` subcommand, with examples |
-| [[stature:frames]] | The frame file format, assignments, precedence and worked examples |
-| [[stature:channels]] | The 48 built-in channels, their defaults and what an override means |
-| [[stature:parts-and-regions]] | Rigs, part factors, first-person arms and hurt regions |
-| [[stature:thresholds]] | The server config file, the M10 channel options and the micro and macro mechanics |
-| [[stature:dangerous]] | Sizes past the game's scale envelope, and how the box and the model separate |
-| [[stature:compatibility]] | Pehkui, other scale modifiers, claims, shaders and the client and server rules |
+| [[stature:reference/commands]] | Every `/stature` subcommand, with examples |
+| [[stature:scaling/frames]] | The frame file format, assignments, precedence and worked examples |
+| [[stature:scaling/channels]] | The 48 built-in channels, their defaults and what an override means |
+| [[stature:scaling/parts-and-regions]] | Rigs, part factors, first-person arms and hurt regions |
+| [[stature:scaling/thresholds]] | The server config file, the M10 channel options and the micro and macro mechanics |
+| [[stature:reference/dangerous]] | Sizes past the game's scale envelope, and how the box and the model separate |
+| [[stature:reference/compatibility]] | Pehkui, other scale modifiers, claims, shaders and the client and server rules |
 | [[stature:api]] | The supported facade for another mod: sizes, shapes, channels and integration frames |
 | [[stature:api/events]] | The change events, their causes and the ordering and thread guarantees |
